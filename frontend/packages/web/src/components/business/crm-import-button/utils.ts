@@ -7,10 +7,14 @@ import {
   downloadAccountTemplate,
   downloadBusinessTitleTemplate,
   downloadContactTemplate,
+  downloadContractInvoicedTemplate,
+  downloadContractPaymentPlanTemplate,
   downloadContractPaymentRecordTemplate,
+  downloadContractTemplate,
   downloadCustomFormTemplate,
   downloadLeadTemplate,
   downloadOptTemplate,
+  downloadOrderTemplate,
   downloadPoolAccountTemplate,
   downloadPoolLeadTemplate,
   downloadProductPriceTemplate,
@@ -18,10 +22,14 @@ import {
   importAccount,
   importBusinessTitle,
   importContact,
+  importContract,
+  importContractInvoiced,
+  importContractPaymentPlan,
   importContractPaymentRecord,
   importCustomForm,
   importLead,
   importOpportunity,
+  importOrder,
   importPoolAccount,
   importPoolLead,
   importProduct,
@@ -29,10 +37,14 @@ import {
   preCheckImportAccount,
   preCheckImportBusinessTitle,
   preCheckImportContact,
+  preCheckImportContract,
+  preCheckImportContractInvoiced,
+  preCheckImportContractPaymentPlan,
   preCheckImportContractPaymentRecord,
   preCheckImportCustomForm,
   preCheckImportLead,
   preCheckImportOpt,
+  preCheckImportOrder,
   preCheckImportPoolAccount,
   preCheckImportPoolLead,
   preCheckImportProduct,
@@ -47,10 +59,14 @@ export type ImportApiType =
   | FormDesignKeyEnum.CUSTOMER_OPEN_SEA
   | FormDesignKeyEnum.CONTACT
   | FormDesignKeyEnum.PRODUCT
+  | FormDesignKeyEnum.INVOICE
+  | FormDesignKeyEnum.CONTRACT_PAYMENT
   | FormDesignKeyEnum.CONTRACT_PAYMENT_RECORD
   | FormDesignKeyEnum.PRICE
   | ImportTypeExcludeFormDesignEnum.CONTRACT_BUSINESS_TITLE_IMPORT
-  | FormDesignKeyEnum.CUSTOM_FORM;
+  | FormDesignKeyEnum.CUSTOM_FORM
+  | FormDesignKeyEnum.CONTRACT
+  | FormDesignKeyEnum.ORDER;
 
 export interface importRequestType {
   preCheck: (params: ImportRequestParams) => Promise<{ data: ValidateInfo }>;
@@ -109,14 +125,34 @@ export const importApiMap: Record<ImportApiType, importRequestType> = {
     save: (params) => importContractPaymentRecord(params.uploadParams),
     download: downloadContractPaymentRecordTemplate,
   },
+  [FormDesignKeyEnum.INVOICE]: {
+    preCheck: (params) => preCheckImportContractInvoiced(params.uploadParams),
+    save: (params) => importContractInvoiced(params.uploadParams),
+    download: downloadContractInvoicedTemplate,
+  },
+  [FormDesignKeyEnum.CONTRACT_PAYMENT]: {
+    preCheck: (params) => preCheckImportContractPaymentPlan(params.uploadParams),
+    save: (params) => importContractPaymentPlan(params.uploadParams),
+    download: downloadContractPaymentPlanTemplate,
+  },
+  [FormDesignKeyEnum.CONTRACT]: {
+    preCheck: (params) => preCheckImportContract(params.uploadParams),
+    save: (params) => importContract(params.uploadParams),
+    download: downloadContractTemplate,
+  },
+  [FormDesignKeyEnum.ORDER]: {
+    preCheck: (params) => preCheckImportOrder(params.uploadParams),
+    save: (params) => importOrder(params.uploadParams),
+    download: downloadOrderTemplate,
+  },
   [ImportTypeExcludeFormDesignEnum.CONTRACT_BUSINESS_TITLE_IMPORT]: {
     preCheck: (params) => preCheckImportBusinessTitle(params.uploadParams),
     save: (params) => importBusinessTitle(params.uploadParams),
     download: downloadBusinessTitleTemplate,
   },
   [FormDesignKeyEnum.CUSTOM_FORM]: {
-    preCheck: (params) => preCheckImportCustomForm(params.uploadParams, params.customFormId),
-    save: (params) => importCustomForm(params.uploadParams, params.customFormId),
+    preCheck: (params) => preCheckImportCustomForm(params.uploadParams),
+    save: (params) => importCustomForm(params.uploadParams),
     download: downloadCustomFormTemplate,
   },
 };

@@ -1,13 +1,22 @@
 import type { CordysAxios } from '@lib/shared/api/http/Axios';
 import {
   AddApiKeyUrl,
+  AddAiModelUrl,
+  AddAgentTaskUrl,
   CancelCenterExportUrl,
   CreateAuthUrl,
+  DeleteAgentTaskUrl,
+  DeleteAiModelUrl,
   DeleteApiKeyUrl,
   DeleteAuthUrl,
   DisableApiKeyUrl,
   EnableApiKeyUrl,
   ExportCenterDownloadUrl,
+  GetAgentTaskDetailUrl,
+  GetAgentTaskListUrl,
+  GetAiModelListUrl,
+  GetAiModelOptionsUrl,
+  GetAiModelRouteStrategyUrl,
   GetApiKeyListUrl,
   GetAuthDetailUrl,
   GetAuthsUrl,
@@ -25,10 +34,15 @@ import {
   GetThirdTypeListUrl,
   SavePageConfigUrl,
   SendEmailCodeUrl,
+  SwitchAgentTaskUrl,
   SwitchThirdPartyUrl,
   SyncDEUrl,
   TestConfigEmailUrl,
   TestConfigSynchronizationUrl,
+  UpdateAgentTaskUrl,
+  UpdateAiModelRouteStrategyUrl,
+  UpdateAiModelStatusUrl,
+  UpdateAiModelUrl,
   UpdateApiKeyUrl,
   UpdateAuthNameUrl,
   UpdateAuthStatusUrl,
@@ -39,7 +53,7 @@ import {
   UpdateUserPasswordUrl,
 } from '@lib/shared/api/requrls/system/business';
 import { CompanyTypeEnum } from '@lib/shared/enums/commonEnum';
-import type { CommonList } from '@lib/shared/models/common';
+import type { CommonList, TableQueryParams } from '@lib/shared/models/common';
 import { CustomerFollowPlanTableParams, FollowDetailItem } from '@lib/shared/models/customer';
 import type {
   ApiKey,
@@ -64,6 +78,14 @@ import {
   PersonalPassword,
   SendEmailDTO,
 } from '@lib/shared/models/system/business';
+import type {
+  AiModelItem,
+  AiModelOption,
+  AiModelRouteStrategy,
+  AiModelSaveParams,
+  AiModelStatusParams,
+} from '@lib/shared/models/system/aiModel';
+import type { AgentTaskItem, AgentTaskParams } from '@lib/shared/models/system/agentTask';
 import { type DEToken, OrgUserInfo } from '@lib/shared/models/system/org';
 
 export default function useProductApi(CDR: CordysAxios) {
@@ -269,6 +291,76 @@ export default function useProductApi(CDR: CordysAxios) {
     return CDR.get<ThirdPartyResourceConfig>({ url: GetTenderConfigUrl }, { ignoreCancelToken: true });
   }
 
+  // 模型设置-列表查询
+  function getAiModelList(data: TableQueryParams) {
+    return CDR.post<CommonList<AiModelItem>>({ url: GetAiModelListUrl, data });
+  }
+
+  // 模型设置-查询可用模型选项
+  function getAiModelOptions() {
+    return CDR.get<AiModelOption[]>({ url: GetAiModelOptionsUrl });
+  }
+
+  // 模型设置-添加模型
+  function addAiModel(data: AiModelSaveParams) {
+    return CDR.post({ url: AddAiModelUrl, data });
+  }
+
+  // 模型设置-更新模型
+  function updateAiModel(data: AiModelSaveParams) {
+    return CDR.post({ url: UpdateAiModelUrl, data });
+  }
+
+  // 模型设置-更新模型状态
+  function updateAiModelStatus(data: AiModelStatusParams) {
+    return CDR.get({ url: `${UpdateAiModelStatusUrl}/${data.id}` });
+  }
+
+  // 模型设置-删除模型
+  function deleteAiModel(id: string) {
+    return CDR.get({ url: `${DeleteAiModelUrl}/${id}` });
+  }
+
+  // 模型设置-获取路由策略
+  function getAiModelRouteStrategy() {
+    return CDR.get<AiModelRouteStrategy>({ url: GetAiModelRouteStrategyUrl });
+  }
+
+  // 模型设置-更新路由策略
+  function updateAiModelRouteStrategy(data: AiModelRouteStrategy) {
+    return CDR.post({ url: UpdateAiModelRouteStrategyUrl, data });
+  }
+
+  // 全局任务-分页查询任务列表
+  function getAgentTaskList(data: TableQueryParams) {
+    return CDR.post<CommonList<AgentTaskItem>>({ url: GetAgentTaskListUrl, data });
+  }
+
+  // 全局任务-添加任务
+  function addAgentTask(data: AgentTaskParams) {
+    return CDR.post({ url: AddAgentTaskUrl, data });
+  }
+
+  // 全局任务-修改任务
+  function updateAgentTask(data: AgentTaskParams) {
+    return CDR.post({ url: UpdateAgentTaskUrl, data });
+  }
+
+  // 全局任务-启用/禁用任务
+  function switchAgentTask(id: string) {
+    return CDR.get({ url: `${SwitchAgentTaskUrl}/${id}` });
+  }
+
+  // 全局任务-获取任务详情
+  function getAgentTaskDetail(id: string) {
+    return CDR.get<AgentTaskItem>({ url: `${GetAgentTaskDetailUrl}/${id}` });
+  }
+
+  // 全局任务-删除任务
+  function deleteAgentTask(id: string) {
+    return CDR.get({ url: `${DeleteAgentTaskUrl}/${id}` });
+  }
+
   return {
     getConfigEmail,
     updateConfigEmail,
@@ -308,5 +400,19 @@ export default function useProductApi(CDR: CordysAxios) {
     savePageConfig,
     getPageConfig,
     getTenderConfig,
+    getAiModelList,
+    getAiModelOptions,
+    addAiModel,
+    updateAiModel,
+    updateAiModelStatus,
+    deleteAiModel,
+    getAiModelRouteStrategy,
+    updateAiModelRouteStrategy,
+    getAgentTaskList,
+    addAgentTask,
+    updateAgentTask,
+    switchAgentTask,
+    getAgentTaskDetail,
+    deleteAgentTask,
   };
 }

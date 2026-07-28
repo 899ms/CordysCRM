@@ -84,6 +84,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -636,6 +637,12 @@ public class CustomerService {
      */
     public BatchAffectResponse batchToPool(BatchPoolReasonRequest request, String currentUser, String orgId) {
         List<Customer> customers = customerMapper.selectByIds(request.getIds());
+        customers = customers.stream()
+                .filter(customer -> !BooleanUtils.isTrue(customer.getInSharedPool()))
+                .toList();
+        if (CollectionUtils.isEmpty(customers)) {
+            return BatchAffectResponse.builder().success(0).fail(request.getIds().size()).build();
+        }
         CustomerPool targetPool = null;
         Map<String, CustomerPool> ownersDefaultPoolMap = new HashMap<>(4);
         if (StringUtils.isNotBlank(request.getPoolId())) {
@@ -759,11 +766,11 @@ public class CustomerService {
      * @param currentOrg 当前组织
      * @return 导入检查信息
      */
-    public ImportResponse importPreCheck(MultipartFile file, String currentOrg) {
+    public ImportResponse importPreCheck(MultipartFile file, String importType, String currentOrg) {
         if (file == null) {
             throw new GenericException(Translator.get("file_cannot_be_null"));
         }
-        return checkImportExcel(file, currentOrg);
+        return checkImportExcel(file, importType, currentOrg);
     }
 
     /**
@@ -774,6 +781,7 @@ public class CustomerService {
      * @param currentUser 当前用户
      * @return 导入返回信息
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ImportResponse realImport(MultipartFile file, ImportRequest request, String currentOrg, String currentUser) {
         try {
             List<BaseField> fields = moduleFormService.getAllFields(FormKey.CUSTOMER.getKey(), currentOrg);
@@ -806,22 +814,57 @@ public class CustomerService {
                         Map<String, Customer> originCustomerMaps = originCustomerList.stream().collect(Collectors.toMap(Customer::getId, Function.identity()));
                         Map<String, List<BaseModuleFieldValue>> originFieldValueMap = customerFieldService.getResourceFieldMap(ids, true);
 
+                        List<CustomerField> insertField = new ArrayList<>();
+                        List<CustomerFieldBlob> insertFieldBlob = new ArrayList<>();
                         SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
                         ExtCustomerMapper customerBatchMapper = sqlSession.getMapper(ExtCustomerMapper.class);
                         CommonMapper commonMapper = sqlSession.getMapper(CommonMapper.class);
-                        customers.forEach(customer -> {
-                            customer.setInSharedPool(false);
-                            customerBatchMapper.updateCustomer(customer);
-                        });
-                        customerFields.forEach(customerField -> {
-                            commonMapper.updateCustomerField("customer_field", customerField);
-                        });
 
-                        customerFieldBlobs.forEach(customerFieldBlob -> {
-                            commonMapper.updateCustomerField("customer_field_blob", customerFieldBlob);
-                        });
+                        if (CollectionUtils.isNotEmpty(customers)) {
+                            customers.forEach(customer -> {
+                                customer.setInSharedPool(false);
+                                customerBatchMapper.updateCustomer(customer);
+                            });
+                        }
+
+                        if (CollectionUtils.isNotEmpty(customerFields)) {
+                            List<CustomerField> fieldList = customerFieldMapper.selectByIds(customerFields.stream().map(BaseResourceSubField::getId).toList());
+                            Map<String, CustomerField> fieldMap = fieldList.stream().collect(Collectors.toMap(CustomerField::getId, Function.identity()));
+                            customerFields.forEach(customerField -> {
+                                if (fieldMap.containsKey(customerField.getId())) {
+                                    commonMapper.updateCustomerField("customer_field", customerField);
+                                } else {
+                                    insertField.add(BeanUtils.copyBean(new CustomerField(), customerField));
+                                }
+                            });
+                        }
+
+                        if (CollectionUtils.isNotEmpty(customerFieldBlobs)) {
+                            List<CustomerFieldBlob> blobList = customerFieldBlobMapper.selectByIds(customerFieldBlobs.stream().map(BaseResourceSubField::getId).toList());
+                            Map<String, CustomerFieldBlob> blobMap = blobList.stream().collect(Collectors.toMap(CustomerFieldBlob::getId, Function.identity()));
+                            customerFieldBlobs.forEach(customerFieldBlob -> {
+                                if (blobMap.containsKey(customerFieldBlob.getId())) {
+                                    commonMapper.updateCustomerField("customer_field_blob", customerFieldBlob);
+                                } else {
+                                    insertFieldBlob.add(BeanUtils.copyBean(new CustomerFieldBlob(), customerFieldBlob));
+                                }
+                            });
+
+                        }
+
                         sqlSession.flushStatements();
                         SqlSessionUtils.closeSqlSession(sqlSession, sqlSessionFactory);
+
+                        if (CollectionUtils.isNotEmpty(insertField)) {
+                            customerFieldMapper.batchInsert(insertField);
+                        }
+                        if (CollectionUtils.isNotEmpty(insertFieldBlob)) {
+                            customerFieldBlobMapper.batchInsert(insertFieldBlob);
+                        }
+
+                        SqlSession currentSession =
+                                SqlSessionUtils.getSqlSession(sqlSessionFactory);
+                        currentSession.clearCache();
 
                         Map<String, Customer> modifiedCustomerMaps = customerMapper.selectByIds(ids).stream().collect(Collectors.toMap(Customer::getId, Function.identity()));
                         Map<String, List<BaseModuleFieldValue>> modifiedFieldValueMap = customerFieldService.getResourceFieldMap(ids, true);
@@ -845,7 +888,7 @@ public class CustomerService {
                 }
             };
             CustomFieldImportEventListener<Customer> eventListener = new CustomFieldImportEventListener<>(fields, Customer.class, currentOrg, currentUser,
-                    "customer_field", afterDo, 2000, null, null);
+                    "customer_field","customer_field_blob", afterDo, 2000, null, null, request.getImportType());
             FastExcelFactory.read(file.getInputStream(), eventListener).headRowNumber(1).ignoreEmptyRow(true).sheet().doRead();
             return ImportResponse.builder().errorMessages(eventListener.getErrList())
                     .successCount(eventListener.getSuccessCount()).failCount(eventListener.getErrList().size()).build();
@@ -862,10 +905,10 @@ public class CustomerService {
      * @param currentOrg 当前组织
      * @return 检查信息
      */
-    private ImportResponse checkImportExcel(MultipartFile file, String currentOrg) {
+    private ImportResponse checkImportExcel(MultipartFile file, String importType, String currentOrg) {
         try {
             List<BaseField> fields = moduleFormService.getAllCustomImportFields(FormKey.CUSTOMER.getKey(), currentOrg);
-            CustomFieldCheckEventListener eventListener = new CustomFieldCheckEventListener(fields, "customer", "customer_field", currentOrg);
+            CustomFieldCheckEventListener eventListener = new CustomFieldCheckEventListener(fields, "customer", "customer_field", currentOrg, importType);
             FastExcelFactory.read(file.getInputStream(), eventListener).headRowNumber(1).ignoreEmptyRow(true).sheet().doRead();
             return ImportResponse.builder().errorMessages(eventListener.getErrList())
                     .successCount(eventListener.getSuccess()).failCount(eventListener.getErrList().size()).build();

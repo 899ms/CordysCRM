@@ -27,13 +27,15 @@
           value-field="id"
           label-field="name"
           class="w-[200px]"
-          @update-value="(e) => searchData(undefined, e)"
+          @update-value="handlePoolChange"
         />
         <CrmImportButton
           v-if="hasAnyPermission(['CUSTOMER_MANAGEMENT_POOL:IMPORT']) && !props.readonly"
           :api-type="FormDesignKeyEnum.CUSTOMER_OPEN_SEA"
           :title="t('module.openSea')"
           :pool-id="openSea"
+          :readonly="!openSea"
+          :disabled-tooltip="!openSea ? t('common.emptyPoolImportTip', { name: t('module.openSea') }) : ''"
           @import-success="() => searchData()"
         />
         <n-button
@@ -591,6 +593,11 @@
     });
     loadList(false, refreshId);
     crmTableRef.value?.scrollTo({ top: 0 });
+  }
+
+  function handlePoolChange(e: string) {
+    checkedRowKeys.value = [];
+    searchData(undefined, e);
   }
 
   function handleGeneratedChart(res: FilterResult, form: FilterForm) {

@@ -97,6 +97,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -665,6 +666,12 @@ public class ClueService {
         LambdaQueryWrapper<Clue> wrapper = new LambdaQueryWrapper<>();
         wrapper.in(Clue::getId, request.getIds());
         List<Clue> clues = clueMapper.selectListByLambda(wrapper);
+        clues = clues.stream()
+                .filter(clue -> !BooleanUtils.isTrue(clue.getInSharedPool()))
+                .toList();
+        if (CollectionUtils.isEmpty(clues)) {
+            return BatchAffectResponse.builder().success(0).fail(request.getIds().size()).build();
+        }
 
         CluePool targetPool = null;
         Map<String, CluePool> ownersDefaultPoolMap = new HashMap<>(4);
@@ -1137,11 +1144,11 @@ public class ClueService {
      * @param currentOrg 当前组织
      * @return 导入检查信息
      */
-    public ImportResponse importPreCheck(MultipartFile file, String currentOrg) {
+    public ImportResponse importPreCheck(MultipartFile file, String importType, String currentOrg) {
         if (file == null) {
             throw new GenericException(Translator.get("file_cannot_be_null"));
         }
-        return checkImportExcel(file, currentOrg);
+        return checkImportExcel(file, importType, currentOrg);
     }
 
     /**
@@ -1152,6 +1159,7 @@ public class ClueService {
      * @param currentUser 当前用户
      * @return 导入返回信息
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ImportResponse realImport(MultipartFile file, ImportRequest request, String currentOrg, String currentUser) {
         try {
             List<BaseField> fields = moduleFormService.getAllFields(FormKey.CLUE.getKey(), currentOrg);
@@ -1185,23 +1193,56 @@ public class ClueService {
                         Map<String, Clue> originClueMaps = originClueList.stream().collect(Collectors.toMap(Clue::getId, Function.identity()));
                         Map<String, List<BaseModuleFieldValue>> originFieldValueMap = clueFieldService.getResourceFieldMap(ids, true);
 
+                        List<ClueField> insertField = new ArrayList<>();
+                        List<ClueFieldBlob> insertFieldBlob = new ArrayList<>();
                         SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
                         ExtClueMapper clueBatchMapper = sqlSession.getMapper(ExtClueMapper.class);
                         CommonMapper commonMapper = sqlSession.getMapper(CommonMapper.class);
                         //更新
-                        clues.forEach(clue -> {
-                            clue.setInSharedPool(false);
-                            clueBatchMapper.updateClue(clue);
-                        });
-                        clueFields.forEach(clueField -> {
-                            commonMapper.updateCustomerField("clue_field", clueField);
-                        });
+                        if (CollectionUtils.isNotEmpty(clues)) {
+                            clues.forEach(clue -> {
+                                clue.setInSharedPool(false);
+                                clueBatchMapper.updateClue(clue);
+                            });
+                        }
 
-                        clueFieldBlobs.forEach(clueFieldBlob -> {
-                            commonMapper.updateCustomerField("clue_field_blob", clueFieldBlob);
-                        });
+                        if (CollectionUtils.isNotEmpty(clueFields)) {
+                            List<ClueField> fieldList = clueFieldMapper.selectByIds(clueFields.stream().map(BaseResourceSubField::getId).toList());
+                            Map<String, ClueField> fieldMap = fieldList.stream().collect(Collectors.toMap(ClueField::getId, Function.identity()));
+                            clueFields.forEach(clueField -> {
+                                if (fieldMap.containsKey(clueField.getId())) {
+                                    commonMapper.updateCustomerField("clue_field", clueField);
+                                } else {
+                                    insertField.add(BeanUtils.copyBean(new ClueField(), clueField));
+                                }
+                            });
+                        }
+
+                        if (CollectionUtils.isNotEmpty(clueFieldBlobs)) {
+                            List<ClueFieldBlob> blobList = clueFieldBlobMapper.selectByIds(clueFieldBlobs.stream().map(BaseResourceSubField::getId).toList());
+                            Map<String, ClueFieldBlob> blobMap = blobList.stream().collect(Collectors.toMap(ClueFieldBlob::getId, Function.identity()));
+                            clueFieldBlobs.forEach(clueFieldBlob -> {
+                                if (blobMap.containsKey(clueFieldBlob.getId())) {
+                                    commonMapper.updateCustomerField("clue_field_blob", clueFieldBlob);
+                                } else {
+                                    insertFieldBlob.add(BeanUtils.copyBean(new ClueFieldBlob(), clueFieldBlob));
+                                }
+                            });
+                        }
+
                         sqlSession.flushStatements();
                         SqlSessionUtils.closeSqlSession(sqlSession, sqlSessionFactory);
+
+                        if (CollectionUtils.isNotEmpty(insertField)) {
+                            clueFieldMapper.batchInsert(insertField);
+                        }
+                        if (CollectionUtils.isNotEmpty(insertFieldBlob)) {
+                            clueFieldBlobMapper.batchInsert(insertFieldBlob);
+                        }
+
+                        SqlSession currentSession =
+                                SqlSessionUtils.getSqlSession(sqlSessionFactory);
+                        currentSession.clearCache();
 
                         Map<String, Clue> modifiedClueMaps = clueMapper.selectByIds(ids).stream().collect(Collectors.toMap(Clue::getId, Function.identity()));
                         Map<String, List<BaseModuleFieldValue>> modifiedFieldValueMap = clueFieldService.getResourceFieldMap(ids, true);
@@ -1225,7 +1266,7 @@ public class ClueService {
                 }
             };
             CustomFieldImportEventListener<Clue> eventListener = new CustomFieldImportEventListener<>(fields, Clue.class, currentOrg, currentUser,
-                    "clue_field", afterDo, 2000, null, null);
+                    "clue_field", "clue_field_blob", afterDo, 2000, null, null, request.getImportType());
             FastExcelFactory.read(file.getInputStream(), eventListener).headRowNumber(1).ignoreEmptyRow(true).sheet().doRead();
             return ImportResponse.builder().errorMessages(eventListener.getErrList())
                     .successCount(eventListener.getSuccessCount()).failCount(eventListener.getErrList().size()).build();
@@ -1242,10 +1283,10 @@ public class ClueService {
      * @param currentOrg 当前组织
      * @return 检查信息
      */
-    private ImportResponse checkImportExcel(MultipartFile file, String currentOrg) {
+    private ImportResponse checkImportExcel(MultipartFile file, String importType, String currentOrg) {
         try {
             List<BaseField> fields = moduleFormService.getAllCustomImportFields(FormKey.CLUE.getKey(), currentOrg);
-            CustomFieldCheckEventListener eventListener = new CustomFieldCheckEventListener(fields, "clue", "clue_field", currentOrg);
+            CustomFieldCheckEventListener eventListener = new CustomFieldCheckEventListener(fields, "clue", "clue_field", currentOrg, importType);
             FastExcelFactory.read(file.getInputStream(), eventListener).headRowNumber(1).ignoreEmptyRow(true).sheet().doRead();
             return ImportResponse.builder().errorMessages(eventListener.getErrList())
                     .successCount(eventListener.getSuccess()).failCount(eventListener.getErrList().size()).build();

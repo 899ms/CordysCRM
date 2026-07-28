@@ -9,6 +9,7 @@ import cn.cordys.common.uid.SerialNumGenerator;
 import cn.cordys.common.util.CommonBeanFactory;
 import cn.cordys.common.util.JSON;
 import cn.cordys.common.util.Translator;
+import cn.cordys.crm.system.constants.ImportType;
 import cn.cordys.crm.system.dto.field.SerialNumberField;
 import cn.cordys.crm.system.dto.field.base.BaseField;
 import cn.cordys.crm.system.excel.CustomImportAfterDoConsumer;
@@ -43,6 +44,7 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
      */
     private final List<BaseResourceSubField> fields;
     private final List<BaseResourceSubField> blobFields;
+    protected final String fieldTableBlob;
     /**
      * 批次限制
      */
@@ -79,14 +81,15 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
     private T mergedTmpEntity;
     private int subRowId;
 
-    public CustomFieldImportEventListener(List<BaseField> fields, Class<T> clazz, String currentOrg, String operator, String fieldTable,
+    public CustomFieldImportEventListener(List<BaseField> fields, Class<T> clazz, String currentOrg, String operator, String fieldTable, String fieldTableBlob,
                                           CustomImportAfterDoConsumer<T, BaseResourceSubField> consumer, int batchSize,
-                                          Map<Integer, List<CellExtra>> mergeCellMap, Map<Integer, Map<Integer, String>> mergeRowDataMap) {
-        super(fields, EntityTableMapper.generateTableName(clazz), fieldTable, currentOrg, mergeCellMap, mergeRowDataMap);
+                                          Map<Integer, List<CellExtra>> mergeCellMap, Map<Integer, Map<Integer, String>> mergeRowDataMap, String importType) {
+        super(fields, EntityTableMapper.generateTableName(clazz), fieldTable, currentOrg, mergeCellMap, mergeRowDataMap, importType);
         this.entityClass = clazz;
         this.operator = operator;
         this.serialNumGenerator = CommonBeanFactory.getBean(SerialNumGenerator.class);
         this.consumer = consumer;
+        this.fieldTableBlob = fieldTableBlob;
         this.batchSize = batchSize > 0 ? batchSize : 2000;
         // 初始化大小,扩容有开销
         this.dataList = new ArrayList<>(batchSize);
@@ -99,8 +102,10 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
     @Override
     public void invokeHeadMap(Map<Integer, String> headMap, AnalysisContext context) {
         super.invokeHeadMap(headMap, context);
-        Optional<BaseField> anySerial = this.fieldMap.values().stream().filter(BaseField::isSerialNumber).findAny();
-        anySerial.ifPresent(field -> serialField = field);
+        if (Strings.CI.equals(importType, ImportType.ADD.name())) {
+            Optional<BaseField> anySerial = this.fieldMap.values().stream().filter(BaseField::isSerialNumber).findAny();
+            anySerial.ifPresent(field -> serialField = field);
+        }
     }
 
     @Override
@@ -113,7 +118,7 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
         }
         // build entity by row-data
         buildEntityFromRow(rowIndex, data);
-        if (dataList.size() >= batchSize || fields.size() >= batchSize || blobFields.size() > batchSize) {
+        if (dataList.size() >= batchSize) {
             batchProcessData();
         }
     }
@@ -157,13 +162,15 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
             if (isNormalRow(rowIndex) || isMergeFirstRow(rowIndex)) {
                 // 非合并行才创建实体
                 String rowKey = IDGenerator.nextStr();
-                Integer key = headMap.entrySet().stream()
-                        .filter(entry -> Strings.CI.equals(entry.getValue(), "唯一ID"))
-                        .map(Map.Entry::getKey)
-                        .findFirst()
-                        .orElse(null);
-                if (key != null && rowData.containsKey(key)) {
-                    rowKey = rowData.get(key);
+                if (Strings.CI.equals(importType, ImportType.UPDATE.name())) {
+                    Integer key = headMap.entrySet().stream()
+                            .filter(entry -> Strings.CI.equals(entry.getValue(), "唯一ID"))
+                            .map(Map.Entry::getKey)
+                            .findFirst()
+                            .orElse(null);
+                    if (key != null && rowData.containsKey(key)) {
+                        rowKey = rowData.get(key);
+                    }
                 }
 
                 mergedTmpEntity = entityClass.getDeclaredConstructor().newInstance();
@@ -185,6 +192,9 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
                 if (field == null || field.isSerialNumber()) {
                     return;
                 }
+                if (Strings.CI.equals(importType, ImportType.UPDATE.name()) && !field.getEditable()) {
+                    return;
+                }
                 Object val = convertValue(rowData.get(k), field);
                 if (val == null) {
                     return;
@@ -201,10 +211,19 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
                         throw new GenericException(e);
                     }
                 } else {
-                    BaseResourceSubField baseResourceSubField = commonMapper.getResourceField(fieldTable, id.get().toString(), field.idOrBusinessKey());
                     BaseResourceSubField resourceField = new BaseResourceSubField();
-                    if (baseResourceSubField != null && StringUtils.isNotBlank(baseResourceSubField.getId())) {
-                        resourceField.setId(baseResourceSubField.getId());
+                    if (Strings.CI.equals(importType, ImportType.UPDATE.name())) {
+                        BaseResourceSubField baseResourceSubField = new BaseResourceSubField();
+                        if (field.isBlob()) {
+                            baseResourceSubField = commonMapper.getResourceField(fieldTableBlob, id.get().toString(), field.idOrBusinessKey());
+                        } else {
+                            baseResourceSubField = commonMapper.getResourceField(fieldTable, id.get().toString(), field.idOrBusinessKey());
+                        }
+                        if (baseResourceSubField != null && StringUtils.isNotBlank(baseResourceSubField.getId())) {
+                            resourceField.setId(baseResourceSubField.getId());
+                        } else {
+                            resourceField.setId(IDGenerator.nextStr());
+                        }
                     } else {
                         resourceField.setId(IDGenerator.nextStr());
                     }

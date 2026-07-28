@@ -18,14 +18,36 @@
     @refresh="searchData"
   >
     <template #actionLeft>
-      <n-button
-        v-if="!props.readonly && !props.isCustomerTab"
-        v-permission="['ORDER:ADD']"
-        type="primary"
-        @click="handleNewClick"
-      >
-        {{ t('order.new') }}
-      </n-button>
+      <div class="flex items-center gap-[12px]">
+        <div class="flex items-center gap-[12px]">
+          <n-button
+            v-if="!props.readonly && !props.isCustomerTab"
+            v-permission="['ORDER:ADD']"
+            type="primary"
+            @click="handleNewClick"
+          >
+            {{ t('order.new') }}
+          </n-button>
+
+          <CrmImportButton
+            v-if="hasAnyPermission(['ORDER:IMPORT']) && !props.readonly && !props.isContractTab && !props.isCustomerTab"
+            :api-type="FormDesignKeyEnum.ORDER"
+            :title="t('module.order')"
+            @import-success="() => searchData()"
+          />
+          <n-button
+            v-if="!props.readonly && !props.isContractTab && !props.isCustomerTab"
+            v-permission="['ORDER:EXPORT']"
+            type="primary"
+            ghost
+            class="n-btn-outline-primary"
+            :disabled="propsRes.data.length === 0"
+            @click="handleExportAllClick"
+          >
+            {{ t('common.exportAll') }}
+          </n-button>
+        </div>
+      </div>
     </template>
     <template #actionRight>
       <CrmAdvanceFilter
@@ -130,6 +152,15 @@
     :show-approval-tip="batchEditApprovalTip"
     @refresh="handleRefresh"
   />
+  <CrmTableExportModal
+    v-model:show="showExportModal"
+    :params="exportParams"
+    :export-columns="exportColumns"
+    :is-export-all="isExportAll"
+    :show-approval-tip="exportApprovalTip"
+    type="order"
+    @create-success="handleExportCreateSuccess"
+  />
 </template>
 
 <script setup lang="ts">
@@ -141,6 +172,7 @@
   import { useI18n } from '@lib/shared/hooks/useI18n';
   import useLocale from '@lib/shared/locale/useLocale';
   import { abbreviateNumber, characterLimit } from '@lib/shared/method';
+  import { ExportTableColumnItem } from '@lib/shared/models/common';
   import { OpportunityStageConfig } from '@lib/shared/models/opportunity';
   import { OrderItem } from '@lib/shared/models/order';
 
@@ -154,8 +186,10 @@
   import CrmApprovalPopover from '@/components/business/crm-approval/components/crm-approval-popover.vue';
   import CrmBatchEditModal from '@/components/business/crm-batch-edit-modal/index.vue';
   import CrmFormCreateDrawer from '@/components/business/crm-form-create-drawer/index.vue';
+  import CrmImportButton from '@/components/business/crm-import-button/index.vue';
   import CrmOperationButton from '@/components/business/crm-operation-button/index.vue';
   import { OpenDetailType } from '@/components/business/crm-stage-board/types';
+  import CrmTableExportModal from '@/components/business/crm-table-export-modal/index.vue';
   import CrmViewSelect from '@/components/business/crm-view-select/index.vue';
   import billboard from './billboard/index.vue';
   import DetailDrawer from './detail.vue';
@@ -170,6 +204,7 @@
   import useLocalForage from '@/hooks/useLocalForage';
   import useModal from '@/hooks/useModal';
   import useOpenNewPage from '@/hooks/useOpenNewPage';
+  import { getExportColumns } from '@/utils/export';
   import { hasAnyPermission } from '@/utils/permission';
 
   import { FullPageEnum } from '@/enums/routeEnum';
@@ -219,10 +254,21 @@
   // 操作
   const checkedRowKeys = ref<DataTableRowKey[]>([]);
   const showEditModal = ref(false);
+  const showExportModal = ref(false);
+  const isExportAll = ref(false);
   const actionConfig = computed(() => ({
     baseAction: props.readonly
       ? []
       : [
+          ...(!props.isContractTab && !props.isCustomerTab
+            ? [
+                {
+                  label: t('common.exportChecked'),
+                  key: 'exportChecked',
+                  permission: ['ORDER:EXPORT'],
+                },
+              ]
+            : []),
           {
             label: t('common.batchEdit'),
             key: 'batchEdit',
@@ -243,8 +289,21 @@
     tableRefreshId.value += 1;
   }
 
+  function handleExportAllClick() {
+    isExportAll.value = true;
+    showExportModal.value = true;
+  }
+
+  function handleExportCreateSuccess() {
+    checkedRowKeys.value = [];
+  }
+
   function handleBatchAction(item: ActionsItem) {
     switch (item.key) {
+      case 'exportChecked':
+        isExportAll.value = false;
+        showExportModal.value = true;
+        break;
       case 'batchEdit':
         handleBatchEdit();
         break;
@@ -334,6 +393,8 @@
   const { reviewByFormResult, reviewByResourceId, revokeByResourceId } = useApprovalResourceAction({
     formKey: FormDesignKeyEnum.ORDER,
   });
+
+  const exportApprovalTip = computed(() => getApprovalActionTip(['ORDER:EXPORT'], 'common.exportApprovalTip'));
   const batchEditApprovalTip = computed(() => getApprovalActionTip(['ORDER:UPDATE'], 'common.batchEditApprovalTip'));
 
   function showDetail(row: OrderItem) {
@@ -443,7 +504,7 @@
 
   await initApprovalPermission();
 
-  const { useTableRes, customFieldsFilterConfig } = await useFormCreateTable({
+  const { useTableRes, customFieldsFilterConfig, fieldList } = await useFormCreateTable({
     formKey: props.formKey,
     excludeFieldIds: ['contractId'],
     operationColumn: {
@@ -538,8 +599,25 @@
     permission: ['ORDER:UPDATE'],
     enableApproval,
   });
-  const { propsRes, propsEvent, advanceFilter, filterItem, loadList, setLoadListParams, setAdvanceFilter } =
-    useTableRes;
+  const {
+    propsRes,
+    propsEvent,
+    tableQueryParams,
+    advanceFilter,
+    filterItem,
+    loadList,
+    setLoadListParams,
+    setAdvanceFilter,
+  } = useTableRes;
+
+  const exportParams = computed(() => ({
+    ...tableQueryParams.value,
+    ids: checkedRowKeys.value,
+  }));
+
+  const exportColumns = computed<ExportTableColumnItem[]>(() =>
+    getExportColumns(propsRes.value.columns, customFieldsFilterConfig.value as FilterFormItem[], fieldList.value, true)
+  );
 
   const crmTableRef = ref<InstanceType<typeof CrmTable>>();
   const billboardRef = ref<InstanceType<typeof billboard>>();

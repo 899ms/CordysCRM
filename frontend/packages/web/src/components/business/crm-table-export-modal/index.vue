@@ -174,12 +174,16 @@
     exportInvoicedSelected,
     exportOpportunityAll,
     exportOpportunitySelected,
+    exportOrderAll,
+    exportOrderSelected,
     exportPaymentPlanAll,
     exportPaymentPlanSelected,
     exportPaymentRecordAll,
     exportPaymentRecordSelected,
+    exportProductAll,
     exportProductPriceAll,
     exportProductPriceSelected,
+    exportProductSelected,
   } from '@/api/modules';
 
   import useExportFieldCache from './useExportFieldCache';
@@ -196,9 +200,11 @@
       | 'contract'
       | 'contractPaymentPlan'
       | 'contractPaymentRecord'
+      | 'product'
       | 'price'
       | 'businessTitle'
       | 'invoice'
+      | 'order'
       | 'customForm';
     exportColumns: ExportTableColumnItem[];
     isExportAll?: boolean;
@@ -228,9 +234,11 @@
     contract: t('module.contract'),
     contractPaymentPlan: t('module.paymentPlan'),
     contractPaymentRecord: t('module.paymentRecord'),
+    product: t('module.productManagement'),
     price: t('module.productManagementPrice'),
     businessTitle: t('module.businessTitle'),
     invoice: t('module.invoice'),
+    order: t('order.all'),
   };
 
   const loading = ref<boolean>(false);
@@ -245,7 +253,6 @@
     }
     return Promise.resolve();
   }
-  const excludedUniqueIdTypes = ['price', 'opportunity', 'contract', 'order'];
 
   const uniqueIdColumn: ExportTableColumnItem = {
     key: 'id',
@@ -255,9 +262,6 @@
 
   const systemList = computed(() => {
     const list = props.exportColumns.filter((item) => item.columnType === ColumnTypeEnum.SYSTEM);
-    if (excludedUniqueIdTypes.includes(props.type)) {
-      return list;
-    }
     return [...list, uniqueIdColumn];
   });
   const customList = computed(() => props.exportColumns.filter((item) => item.columnType === ColumnTypeEnum.CUSTOM));
@@ -359,9 +363,11 @@
     contract: exportContractAll,
     contractPaymentPlan: exportPaymentPlanAll,
     contractPaymentRecord: exportPaymentRecordAll,
+    product: exportProductAll,
     price: exportProductPriceAll,
     businessTitle: exportBusinessTitleAll,
     invoice: exportInvoicedAll,
+    order: exportOrderAll,
     customForm: exportCustomFormAll,
   };
 
@@ -375,9 +381,11 @@
     contract: exportContractSelected,
     contractPaymentPlan: exportPaymentPlanSelected,
     contractPaymentRecord: exportPaymentRecordSelected,
+    product: exportProductSelected,
     price: exportProductPriceSelected,
     businessTitle: exportBusinessTitleSelected,
     invoice: exportInvoicedSelected,
+    order: exportOrderSelected,
     customForm: exportCustomFormSelected,
   };
 

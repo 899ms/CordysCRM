@@ -118,7 +118,7 @@
       {
         "id": "SYSTEM_LICENSE",
         "name": "permission.system.license",
-        "license": true,
+        "license": false,
         "permissions": [
           {
             "id": "LICENSE:READ",
@@ -208,6 +208,9 @@
           },
           {
             "id": "CUSTOMER_MANAGEMENT_POOL:DELETE"
+          },
+          {
+            "id": "CUSTOMER_MANAGEMENT_POOL:IMPORT"
           },
           {
             "id": "CUSTOMER_MANAGEMENT_POOL:EXPORT"
@@ -390,6 +393,9 @@
           },
           {
             "id": "PRODUCT_MANAGEMENT:IMPORT"
+          },
+          {
+            "id": "PRODUCT_MANAGEMENT:EXPORT"
           }
         ]
       },
@@ -578,6 +584,9 @@
             "id": "CONTRACT_PAYMENT_PLAN:DELETE"
           },
           {
+            "id": "CONTRACT_PAYMENT_PLAN:IMPORT"
+          },
+          {
             "id": "CONTRACT_PAYMENT_PLAN:EXPORT"
           }
         ]
@@ -651,6 +660,9 @@
           },
           {
             "id": "CONTRACT_INVOICE:DELETE"
+          },
+          {
+            "id": "CONTRACT_INVOICE:IMPORT"
           },
           {
             "id": "CONTRACT_INVOICE:EXPORT"

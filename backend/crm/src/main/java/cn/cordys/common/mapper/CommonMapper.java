@@ -25,7 +25,7 @@ public interface CommonMapper {
      * @param orgId     组织ID
      * @return 值集合
      */
-    List<String> getCheckValList(@Param("tableName") String tableName,
+    List<BaseResourceSubField> getCheckValList(@Param("tableName") String tableName,
                                  @Param("fieldName") String fieldName, @Param("orgId") String orgId);
 
     /**
@@ -41,7 +41,7 @@ public interface CommonMapper {
     String checkFieldRepeatName(@Param("dataTable") String dataTable, @Param("fieldTable") String fieldTable,
                                 @Param("fieldId") String fieldId, @Param("fieldValue") String fieldValue, @Param("orgId") String orgId);
 
-    List<String> getCheckFieldValList(@Param("dataTable") String dataTable, @Param("fieldTable") String fieldTable,
+    List<BaseResourceSubField> getCheckFieldValList(@Param("dataTable") String dataTable, @Param("fieldTable") String fieldTable,
                                       @Param("fieldId") String fieldId, @Param("orgId") String orgId);
 
     /**
@@ -73,5 +73,7 @@ public interface CommonMapper {
      * @param field
      */
     void updateCustomerField(@Param("tableName") String tableName, @Param("field") BaseResourceSubField field);
+
+    int checkIdCount(@Param("id")String id, @Param("tableName")String tableName);
 }
 

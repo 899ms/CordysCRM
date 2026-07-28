@@ -7,14 +7,16 @@ import cn.cordys.aspectj.context.OperationLogContext;
 import cn.cordys.aspectj.dto.LogContextInfo;
 import cn.cordys.aspectj.dto.LogDTO;
 import cn.cordys.common.constants.ThirdConfigTypeConstants;
-import cn.cordys.crm.system.dto.request.ImportRequest;
 import cn.cordys.common.exception.GenericException;
 import cn.cordys.common.pager.PageUtils;
 import cn.cordys.common.pager.Pager;
 import cn.cordys.common.service.BaseService;
 import cn.cordys.common.uid.IDGenerator;
 import cn.cordys.common.uid.utils.EnumUtils;
-import cn.cordys.common.util.*;
+import cn.cordys.common.util.BeanUtils;
+import cn.cordys.common.util.CodingUtils;
+import cn.cordys.common.util.JSON;
+import cn.cordys.common.util.Translator;
 import cn.cordys.common.utils.BeanCopyUtils;
 import cn.cordys.crm.approval.constants.ApprovalState;
 import cn.cordys.crm.contract.constants.BusinessTitleType;
@@ -22,9 +24,11 @@ import cn.cordys.crm.contract.constants.ContractApprovalStatus;
 import cn.cordys.crm.contract.domain.BusinessTitle;
 import cn.cordys.crm.contract.domain.BusinessTitleConfig;
 import cn.cordys.crm.contract.domain.ContractInvoice;
-import cn.cordys.crm.contract.dto.request.*;
+import cn.cordys.crm.contract.dto.request.BusinessTitleAddRequest;
+import cn.cordys.crm.contract.dto.request.BusinessTitleApprovalRequest;
+import cn.cordys.crm.contract.dto.request.BusinessTitlePageRequest;
+import cn.cordys.crm.contract.dto.request.BusinessTitleUpdateRequest;
 import cn.cordys.crm.contract.dto.response.BusinessTitleListResponse;
-import cn.cordys.crm.system.constants.ImportType;
 import cn.cordys.crm.contract.excel.domain.BusinessTitleExcelDataFactory;
 import cn.cordys.crm.contract.excel.handler.BusinessTitleTemplateWriteHandler;
 import cn.cordys.crm.contract.excel.listener.BusinessTitleCheckEventListener;
@@ -35,8 +39,10 @@ import cn.cordys.crm.integration.common.request.QccThirdConfigRequest;
 import cn.cordys.crm.integration.common.utils.HttpClientUtils;
 import cn.cordys.crm.integration.qcc.constant.QccApiPaths;
 import cn.cordys.crm.integration.qcc.dto.*;
+import cn.cordys.crm.system.constants.ImportType;
 import cn.cordys.crm.system.constants.SheetKey;
 import cn.cordys.crm.system.dto.field.base.BaseField;
+import cn.cordys.crm.system.dto.request.ImportRequest;
 import cn.cordys.crm.system.dto.response.ImportResponse;
 import cn.cordys.crm.system.dto.response.ModuleFormConfigDTO;
 import cn.cordys.crm.system.excel.domain.UserExcelDataFactory;
@@ -61,6 +67,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -417,6 +424,7 @@ public class BusinessTitleService {
      * @param orgId
      * @return
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ImportResponse realImport(MultipartFile file, String userId, String orgId, ImportRequest request) {
         if (file == null) {
             throw new GenericException(Translator.get("file_cannot_be_null"));
@@ -431,7 +439,6 @@ public class BusinessTitleService {
                     afterDto = (businessTitles) -> {
                         List<LogDTO> logs = new ArrayList<>();
                         businessTitles.forEach(title -> {
-                            title.setId(IDGenerator.nextStr());
                             title.setType(BusinessTitleType.CUSTOM.name());
                             title.setApprovalStatus(ContractApprovalStatus.APPROVING.name());
                             logs.add(new LogDTO(orgId, title.getId(), userId, LogType.ADD, LogModule.CONTRACT_BUSINESS_TITLE, title.getName()));
@@ -450,10 +457,8 @@ public class BusinessTitleService {
                         Set<String> titleSet = new HashSet<>();
                         businessTitles.removeIf(user -> !titleSet.add(user.getName()));
                         businessTitles.forEach(title -> {
-                            //1.通过name查询id
-                            //2.setId 并更新
                             if (idMap.containsKey(title.getId())) {
-                                BusinessTitle originTitle = idMap.get(title.getName());
+                                BusinessTitle originTitle = idMap.get(title.getId());
                                 BeanCopyUtils.fillEmptyFields(title, originTitle);
                                 title.setUpdateTime(System.currentTimeMillis());
                                 title.setUpdateUser(userId);

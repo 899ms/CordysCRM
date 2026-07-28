@@ -5,6 +5,7 @@ import {
   ApproverTypeEnum,
   ProcessStatusEnum,
   type ApprovalResourceTypeEnum,
+  type ApprovalTaskExecuteTimeEnum,
 } from '@lib/shared/enums/process';
 import { RequestEnum } from '@lib/shared/enums/httpEnum';
 import type { SelectedUsersItem } from './module';
@@ -249,10 +250,12 @@ export interface ApprovalTodoItem {
   resourceId: string;
   resourceName: string;
   resourceType: ApprovalResourceTypeEnum;
+  resourceNotFound: boolean;
   applicant: string;
   submitTime: number;
   approvalOperation: ApprovalOperationEnum;
   dataResult: ProcessStatusEnum;
+  executeTime: ApprovalTaskExecuteTimeEnum;
 }
 
 export interface ApprovalOperationParams {

@@ -66,7 +66,7 @@
     () => props.fieldConfig.defaultValue,
     (val) => {
       if (!props.needInitDetail) {
-        value.value = Number.isNaN(Number(val)) || val === '' ? value.value : Number(val);
+        value.value = Number.isNaN(Number(val)) || val === '' || val === null ? value.value : Number(val);
         emit('change', value.value);
       }
     },
@@ -84,7 +84,7 @@
 
       if (val === 'current') {
         value.value = new Date().getTime();
-      } else if (val === 'custom' && props.fieldConfig.defaultValue === null) {
+      } else if (val === 'custom' && props.fieldConfig.defaultValue === null && !value.value) {
         value.value = null;
       }
       emit('change', value.value);

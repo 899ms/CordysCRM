@@ -139,9 +139,6 @@ public class OrderService implements ApprovalResourceHandler {
     public Order add(OrderAddRequest request, String operatorId, String orgId) {
         List<BaseModuleFieldValue> moduleFields = request.getModuleFields();
         ModuleFormConfigDTO moduleFormConfigDTO = request.getModuleFormConfigDTO();
-        if (CollectionUtils.isEmpty(moduleFields)) {
-            throw new GenericException(Translator.get("order.field.required"));
-        }
         if (moduleFormConfigDTO == null) {
             throw new GenericException(Translator.get("order.form.config.required"));
         }
@@ -159,6 +156,7 @@ public class OrderService implements ApprovalResourceHandler {
         order.setCreateUser(operatorId);
         order.setUpdateTime(System.currentTimeMillis());
         order.setUpdateUser(operatorId);
+        order.setApproved(false);
 
         //判断总金额
         setAmount(request.getAmount(), order);
@@ -356,9 +354,6 @@ public class OrderService implements ApprovalResourceHandler {
         Order oldOrder = orderMapper.selectByPrimaryKey(request.getId());
         List<BaseModuleFieldValue> moduleFields = request.getModuleFields();
         ModuleFormConfigDTO moduleFormConfigDTO = request.getModuleFormConfigDTO();
-        if (CollectionUtils.isEmpty(moduleFields)) {
-            throw new GenericException(Translator.get("order.field.required"));
-        }
         if (moduleFormConfigDTO == null) {
             throw new GenericException(Translator.get("order.form.config.required"));
         }
@@ -555,7 +550,7 @@ public class OrderService implements ApprovalResourceHandler {
                 continue;
             }
             if (!fieldConfigMap.containsKey(fieldUpdateParam.getFieldId()) || fieldUpdateParam.getFieldValue() == null) {
-                return;
+                continue;
             }
             BaseField fieldConfig = fieldConfigMap.get(fieldUpdateParam.getFieldId());
             AbstractModuleFieldResolver customFieldResolver = ModuleFieldResolverFactory.getResolver(fieldConfig.getType());

@@ -357,10 +357,6 @@
         window.open(appStore.pageConfig.helpDoc, '_blank');
         break;
       case 'apiDoc':
-        if (!licenseStore.hasLicense()) {
-          openModal(licenseStore.getNoLicenseModalConfig());
-          return;
-        }
         const apiDocUrl = `${window.location.origin}/swagger-ui/index.html`;
         window.open(apiDocUrl, '_blank');
         break;
@@ -377,7 +373,7 @@
 
   onBeforeMount(() => {
     appStore.getVersion();
-    if (route.name !== WorkbenchRouteEnum.WORKBENCH_INDEX) {
+    if (route.name !== WorkbenchRouteEnum.WORKBENCH_BOARD) {
       appStore.initMessage();
     }
     appStore.connectSystemMessageSSE(userStore.showSystemNotify);

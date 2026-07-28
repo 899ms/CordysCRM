@@ -1,5 +1,6 @@
 import createAxios from '@lib/shared/api/http';
 import useAgentApi from '@lib/shared/api/modules/agent';
+import useAiApi from '@lib/shared/api/modules/ai';
 import useClueApi from '@lib/shared/api/modules/clue';
 import useContractApi from '@lib/shared/api/modules/contract';
 import useCustomerApi from '@lib/shared/api/modules/customer';
@@ -37,6 +38,7 @@ const clueApi = useClueApi(CDR);
 const roleApi = useRoleApi(CDR);
 const homeApi = useHomeApi(CDR);
 const loginApi = useLoginApi(CDR);
+const aiApi = useAiApi(CDR);
 const agentApi = useAgentApi(CDR);
 const moduleApi = useModuleApi(CDR);
 const followApi = useFollowApi(CDR);
@@ -111,6 +113,11 @@ export const {
   getOrderStatusConfig,
   updateOrderStage,
   downloadOrder,
+  exportOrderAll,
+  exportOrderSelected,
+  preCheckImportOrder,
+  downloadOrderTemplate,
+  importOrder,
   deleteOrderStatus,
   getOrderStatistic,
   saveAdvanceConfig,
@@ -141,6 +148,14 @@ export const {
   fixedFollowRecordView,
   getFollowPlanViewList,
   updateFollowPlanStatus,
+  getFollowRecordCommentList,
+  addFollowRecordComment,
+  updateFollowRecordComment,
+  deleteFollowRecordComment,
+  getFollowPlanCommentList,
+  addFollowPlanComment,
+  updateFollowPlanComment,
+  deleteFollowPlanComment,
   updateFollowRecordView,
   enableFollowRecordView,
   deleteFollowRecordView,
@@ -177,6 +192,8 @@ export const {
   preCheckImportProductPrice,
   importProductPrice,
   copyProductPrice,
+  exportProductAll,
+  exportProductSelected,
 } = productApi;
 
 export const {
@@ -550,6 +567,9 @@ export const {
   getInvoicedFormSnapshotConfig,
   exportInvoicedAll,
   exportInvoicedSelected,
+  preCheckImportContractInvoiced,
+  downloadContractInvoicedTemplate,
+  importContractInvoiced,
   revokeInvoiced,
   approvalInvoiced,
   batchDeleteInvoiced,
@@ -565,6 +585,9 @@ export const {
   getInvoicedInContractList,
   getContractDetailSnapshot,
   getInvoicedDetailSnapshot,
+  preCheckImportContract,
+  downloadContractTemplate,
+  importContract,
   getContractStatistic,
   sortContract,
   getPaymentRecordStatistic,
@@ -577,6 +600,9 @@ export const {
   updateContractStage,
   saveContractAdvanceConfig,
   switchContractCirculationType,
+  preCheckImportContractPaymentPlan,
+  importContractPaymentPlan,
+  downloadContractPaymentPlanTemplate,
 } = contractApi;
 
 export const {
@@ -618,6 +644,20 @@ export const {
   testConfigSynchronization,
   updateConfigSynchronization,
   getTenderConfig,
+  getAiModelList,
+  getAiModelOptions,
+  addAiModel,
+  updateAiModel,
+  updateAiModelStatus,
+  deleteAiModel,
+  getAiModelRouteStrategy,
+  updateAiModelRouteStrategy,
+  getAgentTaskList,
+  addAgentTask,
+  updateAgentTask,
+  switchAgentTask,
+  getAgentTaskDetail,
+  deleteAgentTask,
 } = businessApi;
 
 export const {
@@ -760,7 +800,9 @@ export const {
   batchRemoveRoleMember,
 } = roleApi;
 
-export const { login, signout, isLogin, getKey, getThirdCallback, getThirdOauthCallback } = loginApi;
+export const { login, signout, isLogin, getKey, getThirdCallback, getThirdOauthCallback, getOauthState } = loginApi;
+
+export const { streamAgentChat, cancelAgentChat } = aiApi;
 
 export const { getSystemVersion, changeLocaleBackEnd } = sysApi;
 

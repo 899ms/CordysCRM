@@ -214,22 +214,52 @@
       } else if (field.type === FieldTypeEnum.DATE_TIME) {
         if (field.resourceFieldId) {
           newRow[key] = formatTimeValue(field.defaultValue, field.dateType);
+        } else if (field.dateDefaultType === 'current') {
+          newRow[key] = Date.now();
         } else {
           newRow[key] =
-            Number.isNaN(Number(field.defaultValue)) || field.defaultValue === '' ? null : Number(field.defaultValue);
+            Number.isNaN(Number(field.defaultValue)) || field.defaultValue === '' || field.defaultValue === null
+              ? null
+              : Number(field.defaultValue);
         }
       } else if (field.type === FieldTypeEnum.FORMULA) {
         newRow[key] = field.resourceFieldId ? null : field.defaultValue ?? null;
+      } else if ([FieldTypeEnum.MEMBER, FieldTypeEnum.MEMBER_MULTIPLE].includes(field.type)) {
+        if (field.hasCurrentUser) {
+          newRow[key] = field.resourceFieldId ? userStore.userInfo.name : userStore.userInfo.id;
+          field.initialOptions = [
+            ...(field.initialOptions || []),
+            {
+              id: userStore.userInfo.id,
+              name: userStore.userInfo.name,
+            },
+          ].filter((option, index, self) => self.findIndex((o) => o.id === option.id) === index);
+        } else {
+          newRow[key] = field.defaultValue;
+        }
+        if (field.type === FieldTypeEnum.MEMBER_MULTIPLE && typeof newRow[key] === 'string') {
+          // 多选值为数组
+          newRow[key] = [newRow[key]];
+        }
+      } else if ([FieldTypeEnum.DEPARTMENT, FieldTypeEnum.DEPARTMENT_MULTIPLE].includes(field.type)) {
+        if (field.hasCurrentUserDept) {
+          newRow[key] = field.resourceFieldId ? userStore.userInfo.departmentName : userStore.userInfo.departmentId;
+          field.initialOptions = [
+            ...(field.initialOptions || []),
+            {
+              id: userStore.userInfo.departmentId,
+              name: userStore.userInfo.departmentName,
+            },
+          ].filter((option, index, self) => self.findIndex((o) => o.id === option.id) === index);
+        } else {
+          newRow[key] = field.defaultValue;
+        }
+        if (field.type === FieldTypeEnum.DEPARTMENT_MULTIPLE && typeof newRow[key] === 'string') {
+          // 多选值为数组
+          newRow[key] = [newRow[key]];
+        }
       } else if (
-        [
-          FieldTypeEnum.SELECT_MULTIPLE,
-          FieldTypeEnum.DATA_SOURCE,
-          FieldTypeEnum.PICTURE,
-          FieldTypeEnum.DEPARTMENT,
-          FieldTypeEnum.DEPARTMENT_MULTIPLE,
-          FieldTypeEnum.MEMBER,
-          FieldTypeEnum.MEMBER_MULTIPLE,
-        ].includes(field.type)
+        [FieldTypeEnum.SELECT_MULTIPLE, FieldTypeEnum.DATA_SOURCE, FieldTypeEnum.PICTURE].includes(field.type)
       ) {
         newRow[key] = [];
       } else {

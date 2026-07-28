@@ -1,5 +1,5 @@
 import { useMessage } from 'naive-ui';
-import { cloneDeep } from 'lodash-es';
+import { cloneDeep, isEqual } from 'lodash-es';
 import dayjs from 'dayjs';
 
 import {
@@ -348,6 +348,36 @@ export default function useFormCreateApi(props: FormCreateApiProps) {
   }
 
   /**
+   * 字段联动
+   * @param item 触发字段
+   */
+  function applyFieldLink(item: FormCreateField, callback?: () => void) {
+    const currentFieldValue = formDetail.value[item.id];
+    const linkField = fieldList.value.find((f) => f.id === item.linkProp?.targetField);
+    if (item.linkProp?.linkOptions) {
+      for (let i = 0; i < item.linkProp?.linkOptions.length; i++) {
+        const option = item.linkProp?.linkOptions[i];
+        if (isEqual(currentFieldValue, option.current)) {
+          if (linkField) {
+            if (option.method === 'HIDDEN') {
+              linkField.linkRange = Array.isArray(option.target) ? option.target : [option.target];
+            } else {
+              linkField.linkRange = undefined;
+              formDetail.value[linkField.id] = option.target;
+            }
+            return;
+          }
+        } else if (linkField) {
+          linkField.linkRange = undefined;
+        }
+      }
+      if (callback) {
+        callback();
+      }
+    }
+  }
+
+  /**
    * 表单描述显示规则处理
    * @param form 表单数据
    */
@@ -410,7 +440,7 @@ export default function useFormCreateApi(props: FormCreateApiProps) {
   }
 
   function makeDescriptionItem(item: FormCreateField, form: FormDetail) {
-    if (item.show === false || !item.readable) return;
+    if (!item.readable) return; // 这里不过滤 show = false字段，在描述组件内过滤
     if (item.businessKey === 'expectedEndTime' && !item.resourceFieldId) {
       descriptions.value.push({
         label: item.name,
@@ -418,7 +448,7 @@ export default function useFormCreateApi(props: FormCreateApiProps) {
         slotName: FieldTypeEnum.DATE_TIME,
         fieldInfo: {
           ...item,
-          editable: !hasAnyPermission(['OPPORTUNITY_MANAGEMENT:UPDATE']),
+          editable: hasAnyPermission(['OPPORTUNITY_MANAGEMENT:UPDATE']),
         },
         tooltipPosition: 'top-end',
       });
@@ -883,16 +913,19 @@ export default function useFormCreateApi(props: FormCreateApiProps) {
         ].includes(subField.type)
       ) {
         // 处理成员和数据源类型的字段
-        subField.initialOptions = options
-          ?.filter((e) =>
-            formDetail.value[parentFieldId]?.some((item: Record<string, any>) =>
-              item[subField.businessKey!]?.includes(e.id)
+        subField.initialOptions = [
+          ...(subField.initialOptions || []),
+          ...(options
+            ?.filter((e) =>
+              formDetail.value[parentFieldId]?.some((item: Record<string, any>) =>
+                item[subField.businessKey!]?.includes(e.id)
+              )
             )
-          )
-          .map((e) => ({
-            ...e,
-            name: e.name || t('common.optionNotExist'),
-          }));
+            .map((e) => ({
+              ...e,
+              name: e.name || t('common.optionNotExist'),
+            })) || []),
+        ];
       }
     } else {
       const options = res.optionMap?.[subField.id];
@@ -906,14 +939,17 @@ export default function useFormCreateApi(props: FormCreateApiProps) {
         ].includes(subField.type)
       ) {
         // 处理成员和数据源类型的字段
-        subField.initialOptions = options
-          ?.filter((e) =>
-            formDetail.value[parentFieldId]?.some((item: Record<string, any>) => item[subField.id]?.includes(e.id))
-          )
-          .map((e) => ({
-            ...e,
-            name: e.name || t('common.optionNotExist'),
-          }));
+        subField.initialOptions = [
+          ...(subField.initialOptions || []),
+          ...(options
+            ?.filter((e) =>
+              formDetail.value[parentFieldId]?.some((item: Record<string, any>) => item[subField.id]?.includes(e.id))
+            )
+            .map((e) => ({
+              ...e,
+              name: e.name || t('common.optionNotExist'),
+            })) || []),
+        ];
       }
     }
   }
@@ -1349,23 +1385,6 @@ export default function useFormCreateApi(props: FormCreateApiProps) {
     item.rules = fullRules;
   }
 
-  function subFieldInit(field: FormCreateField) {
-    let defaultValue = field.defaultValue || '';
-    if (field.resourceFieldId && field.defaultValue) {
-      defaultValue = parseModuleFieldValue(field, field.defaultValue, field.initialOptions);
-    } else if ([FieldTypeEnum.INPUT_NUMBER, FieldTypeEnum.FORMULA].includes(field.type)) {
-      defaultValue = Number.isNaN(Number(defaultValue)) || defaultValue === '' ? null : Number(defaultValue);
-    } else if ([FieldTypeEnum.PICTURE, FieldTypeEnum.ATTACHMENT].includes(field.type)) {
-      defaultValue = defaultValue || [];
-    } else if (getRuleType(field) === 'array') {
-      defaultValue =
-        field.type === FieldTypeEnum.DATA_SOURCE && typeof field.defaultValue === 'string'
-          ? [defaultValue]
-          : defaultValue || [];
-    }
-    field.defaultValue = defaultValue;
-  }
-
   function initFormCreateFieldDefaultValue(field: FormCreateField) {
     let defaultValue = field.defaultValue || '';
     if (field.resourceFieldId && field.defaultValue) {
@@ -1418,7 +1437,7 @@ export default function useFormCreateApi(props: FormCreateApiProps) {
     fieldList.value.forEach((item) => {
       if ([FieldTypeEnum.SUB_PRICE, FieldTypeEnum.SUB_PRODUCT].includes(item.type)) {
         item.subFields?.forEach((subField) => {
-          subFieldInit(subField);
+          initFormCreateFieldDefaultValue(subField);
           replaceRule(subField, item.id);
         });
         if (!formDetail.value[item.id]) {
@@ -1500,7 +1519,7 @@ export default function useFormCreateApi(props: FormCreateApiProps) {
         } else {
           params.moduleFields.push({
             fieldId: item.id,
-            fieldValue: getNormalFieldValue(item, form[item.id]),
+            fieldValue: getNormalFieldValue(item, form[item.id] === t('common.optionNotExist') ? '' : form[item.id]),
           });
         }
       });
@@ -1570,6 +1589,8 @@ export default function useFormCreateApi(props: FormCreateApiProps) {
     resetForm,
     initFormShowControl,
     makeLinkFormFields,
+    applyFieldLink,
+    formDescriptionShowControlRulesSet,
     moduleFormConfig,
     detail,
   };

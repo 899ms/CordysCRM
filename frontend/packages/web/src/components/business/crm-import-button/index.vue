@@ -1,7 +1,12 @@
 <template>
-  <n-button type="primary" ghost class="n-btn-outline-primary" @click="handleImport">
-    {{ `${t('common.import')}${props.title ?? ''}` }}
-  </n-button>
+  <n-tooltip :delay="300" :disabled="!disabledTooltip">
+    <template #trigger>
+      <n-button type="primary" ghost class="n-btn-outline-primary" :disabled="props.readonly" @click="handleImport">
+        {{ `${t('common.import')}${props.title ?? ''}` }}
+      </n-button>
+    </template>
+    {{ props.disabledTooltip }}
+  </n-tooltip>
 
   <ImportModal
     v-model:show="importModal"
@@ -9,7 +14,6 @@
     :description-tip="props.descriptionTip"
     :confirm-loading="validateLoading"
     :download-template-api="downloadTemplateApi"
-    :show-import-radio="showImportRadio"
     @validate="validateTemplate"
   />
 
@@ -32,7 +36,7 @@
 
 <script setup lang="ts">
   import { ref } from 'vue';
-  import { NButton, useMessage } from 'naive-ui';
+  import { NButton, NTooltip, useMessage } from 'naive-ui';
 
   import { FormDesignKeyEnum } from '@lib/shared/enums/formDesignEnum';
   import { useI18n } from '@lib/shared/hooks/useI18n';
@@ -59,6 +63,8 @@
     descriptionTip?: string; // 描述提示
     customFormId?: string;
     poolId?: string | number;
+    readonly?: boolean;
+    disabledTooltip?: string;
   }>();
 
   const emit = defineEmits<{
@@ -67,8 +73,6 @@
 
   const importModal = ref<boolean>(false);
   const validateLoading = ref<boolean>(false);
-
-  const showImportRadio = computed(() => !([FormDesignKeyEnum.PRICE] as ImportApiType[]).includes(props.apiType));
 
   function handleImport() {
     importModal.value = true;
@@ -109,13 +113,11 @@
   });
 
   function getImportRequestParams(file: File, type?: string): ImportRequestParams {
-    const request: ImportUploadParams['request'] = showImportRadio.value
-      ? {
-          importType: type,
-          ...(props.poolId ? { poolId: props.poolId as string } : {}),
-        }
-      : undefined;
-
+    const request: ImportUploadParams['request'] = {
+      importType: type,
+      ...(props.poolId ? { poolId: props.poolId as string } : {}),
+      ...(props.customFormId ? { customFormId: props.customFormId as string } : {}),
+    };
     return {
       uploadParams: {
         fileList: [file],

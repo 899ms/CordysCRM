@@ -28,13 +28,15 @@
           :show-checkmark="false"
           label-field="name"
           class="w-[200px]"
-          @update-value="(e) => searchData(undefined, e)"
+          @update-value="handlePoolChange"
         />
         <CrmImportButton
           v-if="hasAnyPermission(['CLUE_MANAGEMENT_POOL:IMPORT']) && !props.readonly"
           :api-type="FormDesignKeyEnum.CLUE_POOL"
           :title="t('module.cluePool')"
           :pool-id="poolId"
+          :readonly="!poolId"
+          :disabled-tooltip="!poolId ? t('common.emptyPoolImportTip', { name: t('module.cluePool') }) : ''"
           @import-success="() => searchData()"
         />
         <n-button
@@ -585,6 +587,11 @@
     if (!refreshId) {
       crmTableRef.value?.scrollTo({ top: 0 });
     }
+  }
+
+  function handlePoolChange(e: string) {
+    checkedRowKeys.value = [];
+    searchData(undefined, e);
   }
 
   async function getCluePoolOptions() {

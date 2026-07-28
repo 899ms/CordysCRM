@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="cn.cordys.crm.approval.mapper.ExtApprovalTaskMapper">
@@ -13,7 +13,8 @@
     <select id="selectPendingTasks" resultType="cn.cordys.crm.approval.dto.response.ApprovalTodoItemResponse">
         SELECT
         ai.resource_id AS resourceId,
-        COALESCE(oq.name, c.name, so.name, ci.name, '') AS resourceName,
+        COALESCE(oq.name, c.name, so.name, ci.name, '资源不存在') AS resourceName,
+        CASE WHEN COALESCE(oq.name, c.name, so.name, ci.name) IS NULL THEN true ELSE false END AS resourceNotFound,
         UPPER(ai.type) AS resourceType,
         u.name AS applicant,
         ai.submit_time AS submitTime,
@@ -50,12 +51,14 @@
     <select id="selectProcessedTasks" resultType="cn.cordys.crm.approval.dto.response.ApprovalTodoItemResponse">
         SELECT
         ai.resource_id AS resourceId,
-        COALESCE(oq.name, c.name, so.name, ci.name, '') AS resourceName,
+        COALESCE(oq.name, c.name, so.name, ci.name, '资源不存在') AS resourceName,
+        CASE WHEN COALESCE(oq.name, c.name, so.name, ci.name) IS NULL THEN true ELSE false END AS resourceNotFound,
         UPPER(ai.type) AS resourceType,
         u.name AS applicant,
         ai.submit_time AS submitTime,
         CASE WHEN at.action IS NULL OR at.action = '' THEN at.status ELSE at.action END AS approvalOperation,
         ai.approval_status AS dataResult,
+        ai.execute_time,
         at.id AS approvalTaskId,
         at.node_id AS approvalNodeId,
         at.instance_id AS approvalInstanceId,
@@ -85,10 +88,12 @@
     <select id="selectInitiatedTasks" resultType="cn.cordys.crm.approval.dto.response.ApprovalTodoItemResponse">
         SELECT
         ai.resource_id AS resourceId,
-        COALESCE(oq.name, c.name, so.name, ci.name, '') AS resourceName,
+        COALESCE(oq.name, c.name, so.name, ci.name, '资源不存在') AS resourceName,
+        CASE WHEN COALESCE(oq.name, c.name, so.name, ci.name) IS NULL THEN true ELSE false END AS resourceNotFound,
         UPPER(ai.type) AS resourceType,
         u.name AS applicant,
         ai.submit_time AS submitTime,
+        ai.execute_time,
         ai.approval_status AS approvalOperation,
         ai.approval_status AS dataResult,
         NULL AS approvalTaskId,
@@ -117,10 +122,12 @@
     <select id="selectCcTasks" resultType="cn.cordys.crm.approval.dto.response.ApprovalTodoItemResponse">
         SELECT
         ai.resource_id AS resourceId,
-        COALESCE(oq.name, c.name, so.name, ci.name, '') AS resourceName,
+        COALESCE(oq.name, c.name, so.name, ci.name, '资源不存在') AS resourceName,
+        CASE WHEN COALESCE(oq.name, c.name, so.name, ci.name) IS NULL THEN true ELSE false END AS resourceNotFound,
         UPPER(ai.type) AS resourceType,
         u.name AS applicant,
         ai.submit_time AS submitTime,
+        ai.execute_time,
         CASE WHEN at.action IS NULL OR at.action = '' THEN at.status ELSE at.action END AS approvalOperation,
         ai.approval_status AS dataResult,
         at.id AS approvalTaskId,

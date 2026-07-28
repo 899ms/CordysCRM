@@ -143,11 +143,8 @@ public class ContractService implements ApprovalResourceHandler {
     @OperationLog(module = LogModule.CONTRACT_INDEX, type = LogType.ADD, resourceName = "{#request.name}")
     @HitApproval(formKey = FormKey.CONTRACT, executeType = ExecuteTimingEnum.CREATE, operatorId = "{#operatorId}")
     public Contract add(ContractAddRequest request, String operatorId, String orgId) {
-        List<BaseModuleFieldValue> moduleFields = request.getModuleFields();
         ModuleFormConfigDTO moduleFormConfigDTO = request.getModuleFormConfigDTO();
-        if (CollectionUtils.isEmpty(moduleFields)) {
-            throw new GenericException(Translator.get("contract.field.required"));
-        }
+        List<BaseModuleFieldValue> moduleFields = request.getModuleFields() == null ? new ArrayList<>() : request.getModuleFields();
         if (moduleFormConfigDTO == null) {
             throw new GenericException(Translator.get("contract.form.config.required"));
         }
@@ -171,6 +168,7 @@ public class ContractService implements ApprovalResourceHandler {
         contract.setCreateUser(operatorId);
         contract.setUpdateTime(System.currentTimeMillis());
         contract.setUpdateUser(operatorId);
+        contract.setApproved(false);
 
         if (!dictService.isDictConfigEnable(DictModule.CONTRACT_APPROVAL.name(), orgId)) {
             contract.setApprovalStatus(ContractApprovalStatus.NONE.name());
@@ -366,11 +364,8 @@ public class ContractService implements ApprovalResourceHandler {
     @HitApproval(formKey = FormKey.CONTRACT, executeType = ExecuteTimingEnum.UPDATE, resourceId = "{#request.id}", updateType = "{#request.updateType}", operatorId = "{#userId}", comment = "{#request.comment}")
     public Contract update(ContractUpdateRequest request, String userId, String orgId) {
         Contract oldContract = contractMapper.selectByPrimaryKey(request.getId());
-        List<BaseModuleFieldValue> moduleFields = request.getModuleFields();
+        List<BaseModuleFieldValue> moduleFields = request.getModuleFields() == null ? new ArrayList<>() : request.getModuleFields();
         ModuleFormConfigDTO moduleFormConfigDTO = request.getModuleFormConfigDTO();
-        if (CollectionUtils.isEmpty(moduleFields)) {
-            throw new GenericException(Translator.get("contract.field.required"));
-        }
         if (moduleFormConfigDTO == null) {
             throw new GenericException(Translator.get("contract.form.config.required"));
         }
@@ -839,7 +834,7 @@ public class ContractService implements ApprovalResourceHandler {
                 continue;
             }
             if (!fieldConfigMap.containsKey(fieldUpdateParam.getFieldId()) || fieldUpdateParam.getFieldValue() == null) {
-                return;
+                continue;
             }
             BaseField fieldConfig = fieldConfigMap.get(fieldUpdateParam.getFieldId());
             AbstractModuleFieldResolver customFieldResolver = ModuleFieldResolverFactory.getResolver(fieldConfig.getType());

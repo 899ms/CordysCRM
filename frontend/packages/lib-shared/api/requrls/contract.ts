@@ -16,6 +16,11 @@ export const RevokeContractUrl = '/contract/revoke';
 export const ContractStatisticUrl = '/contract/statistic';
 export const SortContractUrl = '/contract/sort';
 
+// 合同导入
+export const PreCheckContractImportUrl = '/contract/import/pre-check';
+export const DownloadContractTemplateUrl = '/contract/template/download';
+export const ImportContractUrl = '/contract/import';
+
 // 合同导出
 export const ExportContractAllUrl = '/contract/export-all'; // 合同导出全量
 export const ExportContractSelectedUrl = '/contract/export-select'; // 合同导出选中
@@ -42,6 +47,11 @@ export const PaymentPlanDeleteUrl = '/contract/payment-plan/delete'; // 删除�
 export const GetPaymentPlanDetailUrl = '/contract/payment-plan/get'; // 获取回款计划详情
 export const GetPaymentPlanFormConfigUrl = '/contract/payment-plan/module/form'; // 回款计划表单配置
 export const GetPaymentPlanTabUrl = '/contract/payment-plan/tab'; // 回款计划tab显隐
+
+// 回款计划导入
+export const PreCheckPaymentPlanImportUrl = '/contract/payment-plan/import/pre-check';
+export const DownloadPaymentPlanTemplateUrl = '/contract/payment-plan/template/download';
+export const ImportPaymentPlanUrl = '/contract/payment-plan/import';
 
 // 回款计划导出
 export const ExportPaymentPlanAllUrl = '/contract/payment-plan/export-all'; // 回款计划导出全量
@@ -127,6 +137,11 @@ export const ContractInvoicedDetailSnapshotUrl = '/invoice/get/snapshot'; // 发
 export const ContractInvoicedDeleteUrl = '/invoice/delete'; // 发票删除
 export const ContractInvoicedRevokeUrl = '/invoice/revoke'; // 发票撤回
 export const ContractInvoicedTabUrl = '/invoice/tab'; // 发票tab显隐
+
+// 发票导入
+export const PreCheckContractInvoicedImportUrl = '/invoice/import/pre-check'; // 发票导入预检查
+export const DownloadContractInvoicedTemplateUrl = '/invoice/template/download'; // 发票导入模板下载
+export const ImportContractInvoicedUrl = '/invoice/import'; // 发票导入
 
 // 发票视图
 export const UpdateContractInvoicedViewUrl = '/invoice/view/update'; // 更新发票视图

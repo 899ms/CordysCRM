@@ -771,20 +771,14 @@
             <if test="clue.phone != null and clue.phone != ''">
                 phone = #{clue.phone},
             </if>
-            <if test="clue.products != null and clue.products != ''">
-                products = #{clue.products},
+            <if test="clue.products != null and clue.products.size() > 0">
+                products = #{clue.products,typeHandler=cn.cordys.common.handler.ListTypeHandler},
             </if>
             <if test="clue.organizationId != null and clue.organizationId != ''">
                 organization_id = #{clue.organizationId},
             </if>
-            <if test="clue.createTime != null">
-                create_time = #{clue.createTime},
-            </if>
             <if test="clue.updateTime != null">
                 update_time = #{clue.updateTime},
-            </if>
-            <if test="clue.createUser != null and clue.createUser != ''">
-                create_user = #{clue.createUser},
             </if>
             <if test="clue.updateUser != null and clue.updateUser != ''">
                 update_user = #{clue.updateUser},

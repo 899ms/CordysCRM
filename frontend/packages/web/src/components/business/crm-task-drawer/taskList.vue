@@ -16,7 +16,10 @@
             :class="selectedKeys.includes(item.approvalTaskId) ? '!border-[var(--primary-8)]' : ''"
             @click.stop="
               () => {
-                if (!props.activeTaskType.includes('copied') || getResourcePermission(item)) {
+                if (
+                  !item.resourceNotFound &&
+                  (props.activeTaskType.includes('pending') || getResourcePermission(item))
+                ) {
                   emit('openDetail', item.resourceId, item.resourceType, item.approvalTaskId);
                 }
               }
@@ -41,7 +44,7 @@
                   <CrmApprovalStatus :status="item.dataResult" isTag scene="approvalRecord" />
                 </div>
                 <CrmTableButton
-                  v-if="!props.activeTaskType.includes('copied')"
+                  v-if="props.activeTaskType.includes('pending') && !item.resourceNotFound"
                   type="primary"
                   text
                   size="small"
@@ -52,7 +55,7 @@
                   <template #trigger> {{ item.resourceName }} </template>
                 </CrmTableButton>
                 <CrmTableButton
-                  v-else-if="getResourcePermission(item)"
+                  v-else-if="getResourcePermission(item) && !item.resourceNotFound"
                   type="primary"
                   text
                   size="small"
@@ -74,6 +77,10 @@
                   <div class="flex items-center gap-[8px]">
                     <div class="text-[var(--text-n2)]">{{ t('taskDrawer.applicant') }}</div>
                     <div>{{ item.applicant }}</div>
+                  </div>
+                  <div class="flex items-center gap-[8px]">
+                    <div class="text-[var(--text-n2)]">{{ t('taskDrawer.approvalType') }}</div>
+                    <div>{{ getExecuteType(item.executeTime) }}</div>
                   </div>
                   <div class="flex items-center gap-[8px]">
                     <div class="text-[var(--text-n2)]">{{ t('taskDrawer.applyTime') }}</div>
@@ -114,7 +121,12 @@
   import { NButton, NCheckbox, NCheckboxGroup, NSpin, NTooltip } from 'naive-ui';
   import dayjs from 'dayjs';
 
-  import { ApprovalListTypeEnum, ApprovalOperationEnum, ApprovalResourceTypeEnum } from '@lib/shared/enums/process';
+  import {
+    ApprovalListTypeEnum,
+    ApprovalOperationEnum,
+    ApprovalResourceTypeEnum,
+    ApprovalTaskExecuteTimeEnum,
+  } from '@lib/shared/enums/process';
   import { useI18n } from '@lib/shared/hooks/useI18n';
   import type { ApprovalProcessDetail, ApprovalTodoItem } from '@lib/shared/models/system/process';
 
@@ -201,6 +213,19 @@
     } finally {
       loading.value = false;
       finished.value = true;
+    }
+  }
+
+  function getExecuteType(executeTime: ApprovalTaskExecuteTimeEnum) {
+    switch (executeTime) {
+      case ApprovalTaskExecuteTimeEnum.CREATE:
+        return t('common.create');
+      case ApprovalTaskExecuteTimeEnum.UPDATE:
+        return t('common.edit');
+      case ApprovalTaskExecuteTimeEnum.DELETE:
+        return t('common.delete');
+      default:
+        return '-';
     }
   }
 
