@@ -653,11 +653,28 @@ export const {
   getAiModelRouteStrategy,
   updateAiModelRouteStrategy,
   getAgentTaskList,
+  getAgentTaskExecutionRecordList,
   addAgentTask,
   updateAgentTask,
   switchAgentTask,
   getAgentTaskDetail,
   deleteAgentTask,
+  getTermCategoryList,
+  addTermCategory,
+  updateTermCategory,
+  deleteTermCategory,
+  getTermList,
+  addTerm,
+  updateTerm,
+  getTermDetail,
+  deleteTerm,
+  switchTerm,
+  preCheckImportTerm,
+  downloadTermTemplate,
+  importTerm,
+  getTermDiscoveryList,
+  ignoreTermDiscovery,
+  adoptTermDiscovery,
 } = businessApi;
 
 export const {
@@ -802,7 +819,15 @@ export const {
 
 export const { login, signout, isLogin, getKey, getThirdCallback, getThirdOauthCallback, getOauthState } = loginApi;
 
-export const { streamAgentChat, cancelAgentChat } = aiApi;
+export const {
+  streamAgentChat,
+  cancelAgentChat,
+  confirmAgentChat,
+  getAgentConversationPage,
+  getAgentConversationDetail,
+  deleteAgentConversation,
+  renameAgentConversation,
+} = aiApi;
 
 export const { getSystemVersion, changeLocaleBackEnd } = sysApi;
 
@@ -886,4 +911,5 @@ export const {
   agreeApproval,
   batchAgreeApproval,
   testApprovalWebHook,
+  getCCStatistic,
 } = processApi;

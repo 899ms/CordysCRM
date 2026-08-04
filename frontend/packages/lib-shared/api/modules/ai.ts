@@ -1,13 +1,25 @@
-import { AgentChatCancelUrl, AgentChatStreamUrl } from '../requrls/ai';
+import {
+  AgentChatCancelUrl,
+  AgentChatConfirmUrl,
+  AgentChatStreamUrl,
+  AgentConversationDeleteUrl,
+  AgentConversationDetailUrl,
+  AgentConversationPageUrl,
+  AgentConversationRenameUrl,
+} from '../requrls/ai';
 import { useI18n } from '../../hooks/useI18n';
 import { getToken } from '../../method/auth';
-import { getLocalStorage } from '../../method/local-storage';
 import type { CordysAxios } from '../http/Axios';
 import type {
   AgentChatCancelParams,
+  AgentChatConfirmData,
+  AgentChatDoneData,
+  AgentChatProgressData,
+  AgentChatRunData,
   AgentChatStreamEvent,
   AgentChatStreamOptions,
   AgentChatStreamParams,
+  AgentConversationQueryRequest,
 } from '../../models/ai';
 
 interface SseBlock {
@@ -33,7 +45,6 @@ function getApiUrl(path: string): string {
 // 请求头处理
 function getAgentHeaders(): Record<string, string> {
   const currentLocale = localStorage.getItem('CRM-locale') || 'zh-CN';
-  const app = getLocalStorage<Record<string, any>>('app', true);
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -47,7 +58,6 @@ function getAgentHeaders(): Record<string, string> {
       'X-AUTH-TOKEN': sessionId ?? '',
       'CSRF-TOKEN': csrfToken ?? '',
       'Accept-Language': currentLocale,
-      'Organization-Id': app?.orgId,
     };
   }
 
@@ -96,13 +106,25 @@ function getErrorMessage(data: string): string {
 }
 
 function toStreamEvent(block: SseBlock, options: AgentChatStreamOptions): AgentChatStreamEvent | undefined {
-  if (block.event === 'session') {
-    options.onSession?.(block.data, block.id);
+  if (block.event === 'run') {
+    const run = JSON.parse(block.data) as AgentChatRunData;
+
+    options.onSession?.(run.runId, run.conversationId);
 
     return {
-      type: 'session',
+      type: 'run',
+      run,
+      raw: block,
+    };
+  }
+
+  if (block.event === 'progress') {
+    const progress = JSON.parse(block.data) as AgentChatProgressData;
+
+    return {
+      type: 'progress',
       conversationId: block.id,
-      sessionId: block.data,
+      progress,
       raw: block,
     };
   }
@@ -116,6 +138,18 @@ function toStreamEvent(block: SseBlock, options: AgentChatStreamOptions): AgentC
     };
   }
 
+  if (block.event === 'confirm') {
+    const confirm = JSON.parse(block.data) as AgentChatConfirmData;
+
+    return {
+      type: 'confirm',
+      conversationId: block.id,
+      sessionId: confirm.sessionId,
+      confirm,
+      raw: block,
+    };
+  }
+
   if (block.event === 'error') {
     return {
       type: 'error',
@@ -125,9 +159,10 @@ function toStreamEvent(block: SseBlock, options: AgentChatStreamOptions): AgentC
     };
   }
 
-  if (block.data === '[DONE]' || block.event === 'done') {
+  if (block.event === 'done') {
     return {
       type: 'done',
+      data: JSON.parse(block.data) as AgentChatDoneData,
       raw: block,
     };
   }
@@ -253,12 +288,43 @@ export default function useAiApi(CDR: CordysAxios) {
     }
   }
 
-  async function cancelAgentChat(data: AgentChatCancelParams): Promise<void> {
+  async function cancelAgentChat(data: AgentChatCancelParams) {
     await CDR.post({ url: AgentChatCancelUrl, data });
+  }
+
+  async function confirmAgentChat(dialogId: string, answers: Record<string, string>) {
+    await CDR.post({
+      url: `${AgentChatConfirmUrl}/${dialogId}`,
+      data: answers,
+    });
+  }
+
+  function getAgentConversationPage(data: AgentConversationQueryRequest) {
+    return CDR.post({ url: AgentConversationPageUrl, data });
+  }
+
+  function getAgentConversationDetail(conversationId: string) {
+    return CDR.get({ url: `${AgentConversationDetailUrl}/${conversationId}` });
+  }
+
+  function deleteAgentConversation(conversationId: string) {
+    return CDR.get({ url: `${AgentConversationDeleteUrl}/${conversationId}` });
+  }
+
+  function renameAgentConversation(conversationId: string, data: { title: string }) {
+    return CDR.put({
+      url: `${AgentConversationRenameUrl}/${conversationId}`,
+      data,
+    });
   }
 
   return {
     streamAgentChat,
     cancelAgentChat,
+    confirmAgentChat,
+    getAgentConversationPage,
+    getAgentConversationDetail,
+    deleteAgentConversation,
+    renameAgentConversation,
   };
 }

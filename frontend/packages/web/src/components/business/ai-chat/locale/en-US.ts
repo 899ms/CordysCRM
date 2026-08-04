@@ -4,4 +4,13 @@ export default {
   'aiChat.inputPlaceholder': 'Enter an instruction or question',
   'aiChat.send': 'Send',
   'aiChat.thinking': 'Thinking',
+  'aiChat.editRestartTip': 'After editing, the conversation restarts from here. Chat history will not be deleted.',
+  'aiChat.tokensUsed': '{tokens} used',
+  'aiChat.confirmTitle': 'Agent confirmation',
+  'aiChat.confirmExecute': 'Confirm execution',
+  'aiChat.confirmCancel': 'Cancel/Reject',
+  'aiChat.confirmWarning': 'Review write operations before confirming execution.',
+  'aiChat.writeOperationConfirm': 'Operation confirmation',
+  'aiChat.progressInput': 'Input',
+  'aiChat.progressOutput': 'Output',
 };

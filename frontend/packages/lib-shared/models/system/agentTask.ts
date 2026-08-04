@@ -31,3 +31,14 @@ export interface AgentTaskItem extends Omit<AgentTaskParams, 'applicableRoles'> 
   createUserName?: string;
   updateUserName?: string;
 }
+
+export interface AgentTaskExecutionRecordItem {
+  id: string;
+  executionTime: number;
+  taskId: string;
+  taskName: string;
+  triggerReason: string;
+  result: string;
+  confirmUser: string;
+  confirmUserName: string;
+}

@@ -36,6 +36,7 @@ import cn.cordys.crm.system.excel.handler.CustomHeadColWidthStyleStrategy;
 import cn.cordys.crm.system.excel.handler.CustomTemplateWriteHandler;
 import cn.cordys.crm.system.excel.listener.CustomFieldCheckEventListener;
 import cn.cordys.crm.system.excel.listener.CustomFieldImportEventListener;
+import cn.cordys.crm.system.excel.listener.CustomFieldMergeCellEventListener;
 import cn.cordys.crm.system.service.LogService;
 import cn.cordys.crm.system.service.ModuleFormCacheService;
 import cn.cordys.crm.system.service.ModuleFormService;
@@ -43,6 +44,7 @@ import cn.cordys.excel.utils.EasyExcelExporter;
 import cn.cordys.mybatis.BaseMapper;
 import cn.cordys.mybatis.lambda.LambdaQueryWrapper;
 import cn.idev.excel.FastExcelFactory;
+import cn.idev.excel.enums.CellExtraTypeEnum;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import jakarta.annotation.Resource;
@@ -269,7 +271,8 @@ public class CustomFormDataService {
         }
         customFormDataMapper.insert(data);
 
-        baseService.handleAddLogWithResourceName(data, request.getModuleFields());
+        ModuleFormConfigDTO formConfig = moduleFormCacheService.getBusinessFormConfig(request.getCustomFormId(), orgId);
+        baseService.handleAddLogWithSubTable(data, request.getModuleFields(), Translator.get("products_info"), formConfig);
 
         return data;
     }
@@ -295,16 +298,19 @@ public class CustomFormDataService {
 
         CustomFormDataFieldService.setFormKey(originData.getCustomFormId());
         try {
+            ModuleFormConfigDTO formConfig = moduleFormCacheService.getBusinessFormConfig(originData.getCustomFormId(), orgId);
             if (request.getModuleFields() != null) {
                 List<BaseModuleFieldValue> originFields = customFormDataFieldService.getModuleFieldValuesByResourceId(request.getId());
                 // 过滤掉引用字段（显示字段），这些字段不需要参与日志对比
                 List<BaseModuleFieldValue> logOriginFields = filterRefFields(originFields);
                 List<BaseModuleFieldValue> logModifiedFields = filterRefFields(request.getModuleFields());
-                baseService.handleUpdateLog(originData, updateData, logOriginFields, logModifiedFields, originData.getId(), originData.getName());
+                baseService.handleUpdateLogWithSubTable(originData, updateData, logOriginFields, logModifiedFields,
+                        originData.getId(), originData.getName(), Translator.get("products_info"), formConfig);
                 customFormDataFieldService.deleteByResourceId(request.getId());
                 customFormDataFieldService.saveModuleField(updateData, orgId, userId, request.getModuleFields(), true);
             } else {
-                baseService.handleUpdateLog(originData, updateData, null, null, originData.getId(), originData.getName());
+                baseService.handleUpdateLogWithSubTable(originData, updateData, null, null,
+                        originData.getId(), originData.getName(), Translator.get("products_info"), formConfig);
             }
         } finally {
             CustomFormDataFieldService.clearFormKey();
@@ -523,6 +529,15 @@ public class CustomFormDataService {
         try {
             CustomFormDataFieldService.setFormKey(request.getCustomFormId());
             List<BaseField> fields = moduleFormService.getAllFields(request.getCustomFormId(), orgId);
+            boolean supportSubHead = moduleFormService.supportSubHead(fields);
+            int headRowNumber = supportSubHead ? 2 : 1;
+            CustomFieldMergeCellEventListener mergeCellEventListener = new CustomFieldMergeCellEventListener();
+            FastExcelFactory.read(file.getInputStream(), mergeCellEventListener)
+                    .extraRead(CellExtraTypeEnum.MERGE)
+                    .headRowNumber(headRowNumber)
+                    .ignoreEmptyRow(true)
+                    .sheet()
+                    .doRead();
             CustomImportAfterDoConsumer<CustomFormData, BaseResourceSubField> afterDo = (dataList, fieldList, fieldBlobList) -> {
                 var logs = new ArrayList<LogDTO>();
                 ImportType importType = EnumUtils.valueOf(ImportType.class, request.getImportType());
@@ -633,10 +648,10 @@ public class CustomFormDataService {
                     }
                 }
             };
-            CustomFieldImportEventListener<CustomFormData> eventListener = new CustomFieldImportEventListener<>(
-                    fields, CustomFormData.class, orgId, userId, "custom_form_data_field","custom_form_data_field_blob", afterDo, 2000, null, null, request.getImportType());
+            CustomFieldImportEventListener<CustomFormData> eventListener = new CustomFieldImportEventListener<>(fields, CustomFormData.class, orgId, userId,
+                    "custom_form_data_field", "custom_form_data_field_blob", afterDo, 2000, mergeCellEventListener.getMergeCellMap(), mergeCellEventListener.getMergeRowDataMap(), request.getImportType());
             FastExcelFactory.read(file.getInputStream(), eventListener)
-                    .headRowNumber(1).ignoreEmptyRow(true).sheet().doRead();
+                    .headRowNumber(headRowNumber).ignoreEmptyRow(true).sheet().doRead();
             return ImportResponse.builder().errorMessages(eventListener.getErrList())
                     .successCount(eventListener.getSuccessCount()).failCount(eventListener.getErrList().size()).build();
         } catch (Exception e) {
@@ -659,9 +674,20 @@ public class CustomFormDataService {
         try {
             CustomFormDataFieldService.setFormKey(request.getCustomFormId());
             List<BaseField> fields = moduleFormService.getAllCustomImportFields(request.getCustomFormId(), orgId);
-            CustomFieldCheckEventListener eventListener = new CustomFieldCheckEventListener(fields, "custom_form_data", "custom_form_data_field", orgId, request.getImportType());
+            boolean supportSubHead = moduleFormService.supportSubHead(fields);
+            int headRowNumber = supportSubHead ? 2 : 1;
+            CustomFieldMergeCellEventListener mergeCellEventListener = new CustomFieldMergeCellEventListener();
+            FastExcelFactory.read(file.getInputStream(), mergeCellEventListener)
+                    .extraRead(CellExtraTypeEnum.MERGE)
+                    .headRowNumber(headRowNumber)
+                    .ignoreEmptyRow(true)
+                    .sheet()
+                    .doRead();
+
+            CustomFieldCheckEventListener eventListener = new CustomFieldCheckEventListener(fields, "custom_form_data", "custom_form_data_field", orgId,
+                    mergeCellEventListener.getMergeCellMap(), mergeCellEventListener.getMergeRowDataMap(), request.getImportType());
             FastExcelFactory.read(file.getInputStream(), eventListener)
-                    .headRowNumber(1).ignoreEmptyRow(true).sheet().doRead();
+                    .headRowNumber(headRowNumber).ignoreEmptyRow(true).sheet().doRead();
             return ImportResponse.builder().errorMessages(eventListener.getErrList())
                     .successCount(eventListener.getSuccess()).failCount(eventListener.getErrList().size()).build();
         } catch (Exception e) {

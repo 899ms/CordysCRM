@@ -14,7 +14,7 @@
           <div :class="`crm-follow-time-dot ${getFutureClass(item)}`"></div>
           <div class="crm-follow-time-line"></div>
         </div>
-        <div class="mb-[24px] flex w-full flex-col gap-[16px]">
+        <div class="mb-[24px] flex w-full flex-col gap-[12px]">
           <div class="crm-follow-record-title h-[32px]">
             <div class="flex items-center gap-[16px]">
               <slot name="titleLeft" :item="item"></slot>
@@ -29,6 +29,16 @@
               <div class="crm-follow-record-method">
                 {{ (props.type === 'followRecord' ? item.followMethod : item.method) ?? '-' }}
               </div>
+              <n-tooltip
+                v-if="item.opportunityName && props.type === 'followRecord' && item.resourceType === 'CUSTOMER'"
+                trigger="hover"
+                :disabled="!item.opportunityName"
+              >
+                <template #trigger>
+                  <div class="one-line-text max-w-[300px]">{{ item.opportunityName ?? '-' }}</div>
+                </template>
+                {{ item.opportunityName ?? '-' }}
+              </n-tooltip>
             </div>
 
             <slot name="headerAction" :item="item"></slot>
@@ -63,6 +73,17 @@
             </CrmDetailCard>
           </div>
           <div class="crm-follow-record-content" v-html="item.content.replace(/\n/g, '<br />')"></div>
+          <CrmComment
+            class="crm-follow-record-comment-input"
+            :comments="getRecordComments(item)"
+            :comment-count="getRecordCommentCount(item)"
+            :expanded="isCommentExpanded(item.id)"
+            @update:expanded="(expanded) => updateCommentExpanded(item, expanded)"
+            @create-submit="(value) => emit('commentCreate', item, value)"
+            @reply-submit="(value) => emit('commentReply', item, value)"
+            @edit-submit="(value) => emit('commentEdit', item, value)"
+            @delete="(comment) => emit('commentDelete', item, comment)"
+          />
         </div>
       </div>
     </template>
@@ -73,17 +94,24 @@
 </template>
 
 <script setup lang="ts">
+  import { NTooltip } from 'naive-ui';
   import dayjs from 'dayjs';
 
   import { CustomerFollowPlanStatusEnum } from '@lib/shared/enums/customerEnum';
   import { useI18n } from '@lib/shared/hooks/useI18n';
   import type { CustomerFollowPlanListItem, FollowDetailItem } from '@lib/shared/models/customer';
+  import {
+    type FollowCommentActionValue,
+    type FollowCommentItem,
+    type FollowCommentSubmitValue,
+  } from '@lib/shared/models/follow';
 
   import type { Description } from '@/components/pure/crm-detail-card/index.vue';
   import CrmDetailCard from '@/components/pure/crm-detail-card/index.vue';
   import CrmList from '@/components/pure/crm-list/index.vue';
   import CrmTableButton from '@/components/pure/crm-table-button/index.vue';
   import CrmTag from '@/components/pure/crm-tag/index.vue';
+  import CrmComment from '@/components/business/crm-comment/index.vue';
   import StatusTagSelect from './statusTagSelect.vue';
 
   import useOpenNewPage from '@/hooks/useOpenNewPage';
@@ -105,6 +133,10 @@
   const emit = defineEmits<{
     (e: 'reachBottom'): void;
     (e: 'change', item: FollowDetailItem): void;
+    (e: 'commentCreate', item: FollowDetailItem, value: FollowCommentSubmitValue): void;
+    (e: 'commentReply', item: FollowDetailItem, value: FollowCommentActionValue): void;
+    (e: 'commentEdit', item: FollowDetailItem, value: FollowCommentActionValue): void;
+    (e: 'commentDelete', item: FollowDetailItem, comment: FollowCommentItem): void;
   }>();
 
   const listData = defineModel<FollowDetailItem[]>('data', {
@@ -130,6 +162,34 @@
     return time ? dayjs(time).format('YYYY-MM-DD') : '-';
   }
 
+  const commentExpandedIds = ref<string[]>([]);
+  const commentMap = ref<Record<string, FollowCommentItem[]>>({});
+  const commentCountMap = ref<Record<string, number>>({});
+
+  function isCommentExpanded(id: string) {
+    return commentExpandedIds.value.includes(id);
+  }
+
+  function initRecordCommentState(item: FollowDetailItem) {
+    commentMap.value[item.id] ||= [];
+    commentCountMap.value[item.id] ??= item.commentCount || 0;
+    // TODO xinxinwu: 接口联调时在这里按跟进记录/计划类型请求一级评论分页列表，二级评论由一级列表 replies 返回。
+  }
+
+  function updateCommentExpanded(item: FollowDetailItem, expanded: boolean) {
+    const { id } = item;
+    if (expanded && !isCommentExpanded(id)) {
+      commentExpandedIds.value.push(id);
+      initRecordCommentState(item);
+      return;
+    }
+    if (!expanded) {
+      commentExpandedIds.value = commentExpandedIds.value.filter((itemId) => itemId !== id);
+    }
+  }
+
+  const getRecordComments = (item: FollowDetailItem) => commentMap.value[item.id] || [];
+  const getRecordCommentCount = (item: FollowDetailItem) => commentCountMap.value[item.id] ?? item.commentCount ?? 0;
   const { openNewPage } = useOpenNewPage();
   function goDetail(key: string, item: FollowDetailItem) {
     if (key === 'clueName') {

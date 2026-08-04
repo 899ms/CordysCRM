@@ -55,6 +55,14 @@ export const {
   updateFollowRecord,
   addFollowRecord,
   addFollowPlan,
+  getFollowRecordCommentList,
+  addFollowRecordComment,
+  updateFollowRecordComment,
+  deleteFollowRecordComment,
+  getFollowPlanCommentList,
+  addFollowPlanComment,
+  updateFollowPlanComment,
+  deleteFollowPlanComment,
 } = followApi;
 
 export const {
@@ -460,4 +468,5 @@ export const {
   revokeApproval,
   revokeResource,
   reviewResource,
+  getCCStatistic,
 } = processApi;
