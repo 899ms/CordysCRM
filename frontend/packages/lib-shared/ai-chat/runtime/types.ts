@@ -16,7 +16,6 @@ export interface AiChatRuntimeState {
   input: Ref<string>;
   attachments: Ref<AiChatAttachment[]>;
   selectedMcps: Ref<AiChatMcp[]>;
-  modelName: Ref<string>;
   status: ComputedRef<ChatStatus>;
   loading: ComputedRef<boolean>;
   streaming: ComputedRef<boolean>;
@@ -24,10 +23,14 @@ export interface AiChatRuntimeState {
   canSubmit: ComputedRef<boolean>;
   canStop: ComputedRef<boolean>;
   pendingConfirm: ComputedRef<AgentChatConfirmData | undefined>;
+  editingMessageId: Ref<string>;
+  editingContent: Ref<string>;
+  editingMessage: ComputedRef<AiChatMessage | undefined>;
+  canSubmitEdit: ComputedRef<boolean>;
 }
 
 /**
- * 创建 Runtime 时的配置。业务页面通常只需要传 transport/onStop 和初始模型。
+ * 创建 Runtime 时的配置。业务页面通常只需要传 transport/onStop。
  */
 export interface CreateAiChatRuntimeOptions {
   id?: string;
@@ -35,7 +38,6 @@ export interface CreateAiChatRuntimeOptions {
   initialInput?: string;
   initialAttachments?: AiChatAttachment[];
   initialSelectedMcps?: AiChatMcp[];
-  initialModelName?: string;
   createId?: () => string;
   /**
    * AI SDK 的请求适配器。CRM 当前使用 createAgentChatTransport 把后端 SSE 转成 UIMessageChunk。
@@ -63,15 +65,19 @@ export interface AiChatRuntime {
   setInput: (value: string) => void;
   setAttachments: (value: AiChatAttachment[]) => void;
   setSelectedMcps: (value: AiChatMcp[]) => void;
-  setModelName: (value: string) => void;
   removeAttachment: (attachmentId: string) => void;
   submit: (payload?: AiChatSubmitPayload) => Promise<void>;
   stop: () => Promise<void>;
   retry: (messageId?: string) => Promise<void>;
   edit: (messageId: string, content: string, options?: AiChatSendOptions) => Promise<void>;
+  startEditMessage: (messageId: string) => void;
+  cancelEditMessage: () => void;
+  setEditingContent: (value: string) => void;
+  submitEditMessage: () => Promise<void>;
   confirm: (data: AgentChatConfirmData, answers: Record<string, string>) => Promise<void>;
   appendMessage: (message: AiChatMessage) => void;
   updateMessage: (messageId: string, patch: (message: AiChatMessage) => AiChatMessage) => void;
+  reset: (messages?: AiChatMessage[]) => void;
   clear: () => void;
 }
 

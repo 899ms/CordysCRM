@@ -106,6 +106,7 @@
         so.contract_id,
         so.number,
         c.`name` AS contractName,
+        cc.name as customerName,
         so.amount,
         so.stage,
         so.`owner`,
@@ -115,6 +116,7 @@
         so.update_time
         FROM sales_order so
         LEFT JOIN contract c ON so.contract_id = c.id
+        LEFT JOIN customer cc ON so.customer_id = cc.id
         <if test="dataPermission != null and dataPermission.deptIds.size() > 0">
             join sys_organization_user on so.owner = sys_organization_user.user_id
             and (
@@ -551,7 +553,7 @@
     </update>
 
     <update id="updateOrder">
-        update contract
+        update sales_order
         <set>
             <if test="order.name != null and order.name != ''">
                 name = #{order.name},
@@ -568,15 +570,15 @@
             <if test="order.amount != null">
                 amount = #{order.amount},
             </if>
-            <if test="contract.updateTime != null">
-                update_time = #{contract.updateTime},
+            <if test="order.updateTime != null">
+                update_time = #{order.updateTime},
             </if>
-            <if test="contract.updateUser != null and contract.updateUser != ''">
-                update_user = #{contract.updateUser},
+            <if test="order.updateUser != null and order.updateUser != ''">
+                update_user = #{order.updateUser},
             </if>
         </set>
         <where>
-            id = #{contract.id}
+            id = #{order.id}
         </where>
     </update>
 </mapper>

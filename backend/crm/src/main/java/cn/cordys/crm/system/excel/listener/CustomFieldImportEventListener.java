@@ -115,6 +115,22 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
         Integer rowIndex = analysisContext.readRowHolder().getRowIndex();
         if (this.errRows.contains(rowIndex)) {
             // 有错误跳过该行
+
+            // 首行
+            if (isMergeFirstRow(rowIndex)) {
+                try {
+                    createEntity(data);
+                    return;
+                } catch (Exception e) {
+                    throw new GenericException("创建实体类失败");
+                }
+            }
+            // 尾行
+            if (isMergedLastRow(rowIndex)) {
+                dataList.add(mergedTmpEntity);
+                mergedTmpEntity = null;
+            }
+            subRowId++;
             return;
         }
         // build entity by row-data
@@ -160,23 +176,9 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
      */
     private void buildEntityFromRow(Integer rowIndex, Map<Integer, String> rowData) {
         try {
-            if (isNormalRow(rowIndex) || isMergeFirstRow(rowIndex)) {
+            if (isNormalRow(rowIndex) || isMergeFirstRow(rowIndex) && mergedTmpEntity == null) {
                 // 非合并行才创建实体
-                String rowKey = IDGenerator.nextStr();
-                if (Strings.CI.equals(importType, ImportType.UPDATE.name())) {
-                    Integer key = headMap.entrySet().stream()
-                            .filter(entry -> Strings.CI.equals(entry.getValue(), "唯一ID"))
-                            .map(Map.Entry::getKey)
-                            .findFirst()
-                            .orElse(null);
-                    if (key != null && rowData.containsKey(key)) {
-                        rowKey = rowData.get(key);
-                    }
-                }
-
-                mergedTmpEntity = entityClass.getDeclaredConstructor().newInstance();
-                setInternal(mergedTmpEntity, rowKey);
-                subRowId = 1;
+                createEntity(rowData);
             } else {
                 subRowId++;
             }
@@ -200,11 +202,11 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
                 if (val == null) {
                     return;
                 }
-                if (!refSubMap.containsKey(field.getName()) && !isNormalRow(rowIndex) && !isMergeFirstRow(rowIndex)) {
+                if (!refSubMap.containsKey(v) && !isNormalRow(rowIndex) && !isMergeFirstRow(rowIndex)) {
                     // 除合并的首行外, 其余合并行非子表字段都跳过
                     return;
                 }
-                if (businessFieldMap.containsKey(field.getInternalKey()) && !refSubMap.containsKey(field.getName())) {
+                if (businessFieldMap.containsKey(field.getInternalKey()) && !refSubMap.containsKey(v)) {
                     try {
                         setPropertyValue(mergedTmpEntity, businessFieldMap.get(field.getInternalKey()).getBusinessKey(), val);
                     } catch (Exception e) {
@@ -216,9 +218,9 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
                     if (Strings.CI.equals(importType, ImportType.UPDATE.name())) {
                         BaseResourceSubField baseResourceSubField = new BaseResourceSubField();
                         if (field.isBlob()) {
-                            baseResourceSubField = commonMapper.getResourceField(fieldTableBlob, id.get().toString(), field.idOrBusinessKey(), subRowId);
+                            baseResourceSubField = commonMapper.getResourceField(fieldTableBlob, id.get().toString(), field.idOrBusinessKey(), (maxHeadRow > 1 && refSubMap.containsKey(v)) ? subRowId : null);
                         } else {
-                            baseResourceSubField = commonMapper.getResourceField(fieldTable, id.get().toString(), field.idOrBusinessKey(), subRowId);
+                            baseResourceSubField = commonMapper.getResourceField(fieldTable, id.get().toString(), field.idOrBusinessKey(), (maxHeadRow > 1 && refSubMap.containsKey(v)) ? subRowId : null);
                         }
                         if (baseResourceSubField != null && StringUtils.isNotBlank(baseResourceSubField.getId())) {
                             resourceField.setId(baseResourceSubField.getId());
@@ -231,8 +233,8 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
                     resourceField.setResourceId(id.get().toString());
                     resourceField.setFieldId(field.idOrBusinessKey());
                     resourceField.setFieldValue(val);
-                    if (refSubMap.containsKey(field.getName())) {
-                        resourceField.setRefSubId(refSubMap.get(field.getName()));
+                    if (refSubMap.containsKey(v)) {
+                        resourceField.setRefSubId(refSubMap.get(v));
                         resourceField.setRowId(String.valueOf(subRowId));
                         resourceField.setBizId(bizId);
                     }
@@ -270,6 +272,24 @@ public class CustomFieldImportEventListener<T> extends CustomFieldCheckEventList
             log.error("导入错误, 原因: {}", e.getMessage());
             throw new GenericException(Translator.getWithArgs("import.error", rowIndex + 1).concat(" " + e.getMessage()));
         }
+    }
+
+    private void createEntity(Map<Integer, String> rowData) throws Exception {
+        String rowKey = IDGenerator.nextStr();
+        if (Strings.CI.equals(importType, ImportType.UPDATE.name())) {
+            Integer key = headMap.entrySet().stream()
+                    .filter(entry -> Strings.CI.equals(entry.getValue(), "唯一ID"))
+                    .map(Map.Entry::getKey)
+                    .findFirst()
+                    .orElse(null);
+            if (key != null && rowData.containsKey(key)) {
+                rowKey = rowData.get(key);
+            }
+        }
+
+        mergedTmpEntity = entityClass.getDeclaredConstructor().newInstance();
+        setInternal(mergedTmpEntity, rowKey);
+        subRowId = 1;
     }
 
     /**

@@ -4,11 +4,19 @@ import MdKatex from '@vscode/markdown-it-katex';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js';
 import MarkdownIt from 'markdown-it';
-import type { RenderRule } from 'markdown-it/lib/renderer.mjs';
+import type Token from 'markdown-it/lib/token.mjs';
 
 interface RenderMarkdownOptions {
   copyText?: string;
 }
+
+type RenderRule = (
+  tokens: Token[],
+  idx: number,
+  options: MarkdownIt.Options,
+  env: unknown,
+  self: MarkdownIt.Renderer
+) => string;
 
 const MERMAID_LANGUAGE = 'mermaid';
 const { escapeHtml } = MarkdownIt().utils;

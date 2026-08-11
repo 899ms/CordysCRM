@@ -29,6 +29,7 @@ export interface AiChatMcp {
 }
 
 export interface AiChatMeta {
+  model?: string;
   mcps?: AiChatMcp[];
   attachments?: AiChatAttachment[];
   tokens?: number;

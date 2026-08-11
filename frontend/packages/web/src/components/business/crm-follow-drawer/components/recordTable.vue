@@ -111,8 +111,10 @@
       :refresh-key="refreshKey"
       :source-name="sourceName"
       :readonly="!isOwner(activeItem)"
+      :detail="activeItem"
       @delete="handleDelete(sourceId)"
       @edit="handleEdit(activeItem)"
+      @detail-init="handleDetailInit"
     />
   </CrmCard>
 </template>
@@ -320,6 +322,15 @@
     });
     loadList();
     crmTableRef.value?.scrollTo({ top: 0 });
+  }
+
+  function handleDetailInit(detail?: Record<string, any>) {
+    const commentCount = detail?.commentCount;
+    if (!activeItem.value || typeof commentCount !== 'number') {
+      return;
+    }
+
+    activeItem.value.commentCount = commentCount;
   }
 
   const tableAdvanceFilterRef = ref<InstanceType<typeof CrmAdvanceFilter>>();

@@ -1,30 +1,6 @@
 -- set innodb lock wait timeout
 SET SESSION innodb_lock_wait_timeout = 7200;
 
--- modify field table, add unique id
-ALTER TABLE contract_invoice_field ADD COLUMN ref_sub_id VARCHAR(32) NULL COMMENT '引用子表格ID';
-ALTER TABLE contract_invoice_field ADD COLUMN row_id VARCHAR(32) NULL COMMENT '子表格行实例ID';
-ALTER TABLE contract_invoice_field ADD COLUMN biz_id VARCHAR(32) NULL COMMENT '唯一业务行ID';
-
-ALTER TABLE contract_invoice_field_blob ADD COLUMN ref_sub_id VARCHAR(32) NULL COMMENT '引用子表格ID';
-ALTER TABLE contract_invoice_field_blob ADD COLUMN row_id VARCHAR(32) NULL COMMENT '子表格行实例ID';
-ALTER TABLE contract_invoice_field_blob ADD COLUMN biz_id VARCHAR(32) NULL COMMENT '唯一业务行ID';
-
-ALTER TABLE custom_form_data_field ADD COLUMN ref_sub_id VARCHAR(32) NULL COMMENT '引用子表格ID';
-ALTER TABLE custom_form_data_field ADD COLUMN row_id VARCHAR(32) NULL COMMENT '子表格行实例ID';
-ALTER TABLE custom_form_data_field ADD COLUMN biz_id VARCHAR(32) NULL COMMENT '唯一业务行ID';
-
-ALTER TABLE custom_form_data_field_blob ADD COLUMN ref_sub_id VARCHAR(32) NULL COMMENT '引用子表格ID';
-ALTER TABLE custom_form_data_field_blob ADD COLUMN row_id VARCHAR(32) NULL COMMENT '子表格行实例ID';
-ALTER TABLE custom_form_data_field_blob ADD COLUMN biz_id VARCHAR(32) NULL COMMENT '唯一业务行ID';
-
--- add unique index
-CREATE UNIQUE INDEX uk_contract_invoice_field_cell ON contract_field (resource_id, row_id, field_id);
-CREATE UNIQUE INDEX uk_contract_invoice_field_blob_cell ON contract_field_blob (resource_id, row_id, field_id);
-
-CREATE UNIQUE INDEX uk_custom_form_data_field_cell ON contract_field (resource_id, row_id, field_id);
-CREATE UNIQUE INDEX uk_custom_form_data_field_blob_cell ON contract_field_blob (resource_id, row_id, field_id);
-
 -- agent ddl
 CREATE TABLE agent_model
 (
@@ -52,6 +28,17 @@ CREATE TABLE agent_model
 CREATE INDEX idx_provider ON agent_model (provider ASC);
 CREATE INDEX idx_org_id ON agent_model (organization_id ASC);
 CREATE INDEX idx_enable ON agent_model (enable ASC);
+
+CREATE TABLE agent_model_strategy(
+    `id` VARCHAR(32) NOT NULL   COMMENT 'id' ,
+    `chat_models` VARCHAR(1000)    COMMENT '对话或通用模型' ,
+    `task_models` VARCHAR(1000)    COMMENT '任务模型' ,
+    `fallback` TINYINT(1) NOT NULL   COMMENT '是否自动降级' ,
+    PRIMARY KEY (id)
+)  COMMENT = '模型策略'
+    ENGINE = InnoDB
+    DEFAULT CHARSET = utf8mb4
+    COLLATE = utf8mb4_general_ci;
 
 CREATE TABLE agent_task
 (
@@ -136,9 +123,9 @@ CREATE TABLE agent_message(
     `role` VARCHAR(50) NOT NULL  COMMENT '对话角色' ,
     `run_id` VARCHAR(32) NOT NULL   COMMENT '执行ID' ,
     `conversation_id` VARCHAR(32) NOT NULL   COMMENT '对话ID' ,
-    `model_name` VARCHAR(255)    COMMENT '模型名称' ,
     `input_tokens` BIGINT    COMMENT '本次对话输入' ,
     `output_tokens` BIGINT(255)    COMMENT '本次对话输出' ,
+    `total_tokens` BIGINT(255)    COMMENT '累计调用' ,
     `content` MEDIUMTEXT    COMMENT '消息内容' ,
     `organization_id` VARCHAR(32) NOT NULL   COMMENT '组织ID' ,
     `create_time` BIGINT NOT NULL   COMMENT '创建时间' ,
@@ -152,6 +139,7 @@ CREATE TABLE agent_message(
     COLLATE = utf8mb4_general_ci;
 
 CREATE INDEX idx_conversation_id ON agent_message(conversation_id ASC);
+CREATE INDEX idx_run_id ON agent_message(run_id ASC);
 
 CREATE TABLE agent_term_catalog(
     `id` VARCHAR(32) NOT NULL   COMMENT 'ID' ,
@@ -225,12 +213,14 @@ CREATE TABLE agent_model_usage(
     `user_id` VARCHAR(32) NOT NULL   COMMENT '用户ID' ,
     `input_tokens` BIGINT    COMMENT '输入消耗' ,
     `output_tokens` BIGINT    COMMENT '输出消耗' ,
+    `total_tokens` BIGINT    COMMENT '累计调用' ,
     `call_count` BIGINT    COMMENT '调用次数' ,
     `fallback_count` BIGINT    COMMENT '降级次数' ,
     `success_count` BIGINT    COMMENT '成功次数' ,
     `failure_count` BIGINT    COMMENT '失败次数' ,
     `total_latency_ms` BIGINT    COMMENT '总延迟毫秒' ,
     `organization_id` VARCHAR(32) NOT NULL   COMMENT '组织ID' ,
+    `create_time` BIGINT NOT NULL   COMMENT '创建时间' ,
     PRIMARY KEY (id)
 )  COMMENT = '模型用量'
     ENGINE = InnoDB
@@ -250,7 +240,6 @@ CREATE TABLE agent_trace(
     `call_time` BIGINT NOT NULL   COMMENT '执行时间' ,
     `call_ip` VARCHAR(50)    COMMENT '执行IP' ,
     `run_id` VARCHAR(32) NOT NULL   COMMENT '执行ID' ,
-    `prompt` VARCHAR(5000) NOT NULL   COMMENT '原始输入' ,
     `organization_id` VARCHAR(32) NOT NULL   COMMENT '组织ID' ,
     PRIMARY KEY (id)
 )  COMMENT = 'AI执行日志'
@@ -264,12 +253,61 @@ CREATE INDEX idx_run_id ON agent_trace(run_id ASC);
 
 CREATE TABLE agent_trace_event(
     `id` VARCHAR(32) NOT NULL   COMMENT 'ID' ,
-    `trace` BLOB(255)    COMMENT '响应内容' ,
+    `prompt` BLOB    COMMENT '原始输入' ,
+    `trace` BLOB    COMMENT '响应内容' ,
     PRIMARY KEY (id)
 )  COMMENT = 'AI执行日志详情表'
     ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
     COLLATE = utf8mb4_general_ci;
+
+
+ALTER TABLE follow_up_plan
+    ADD COLUMN comment_count BIGINT NOT NULL DEFAULT 0 COMMENT '评论总数，包含回复';
+ALTER TABLE follow_up_record
+    ADD COLUMN comment_count BIGINT NOT NULL DEFAULT 0 COMMENT '评论总数，包含回复';
+
+CREATE TABLE follow_up_plan_comment
+(
+    `id`              VARCHAR(32)   NOT NULL COMMENT 'ID',
+    `resource_id`     VARCHAR(32)   NOT NULL COMMENT '跟进计划ID',
+    `parent_id`       VARCHAR(32)            COMMENT '顶层评论ID',
+    `reply_to_user_id` VARCHAR(32)           COMMENT '被回复人用户ID',
+    `content`         VARCHAR(512) NOT NULL COMMENT '评论内容',
+    `organization_id` VARCHAR(32)   NOT NULL COMMENT '组织ID',
+    `create_time`     BIGINT        NOT NULL COMMENT '创建时间',
+    `update_time`     BIGINT        NOT NULL COMMENT '更新时间',
+    `create_user`     VARCHAR(32)   NOT NULL COMMENT '创建人',
+    `update_user`     VARCHAR(32)   NOT NULL COMMENT '更新人',
+    PRIMARY KEY (`id`)
+) COMMENT = '跟进计划评论'
+    ENGINE = InnoDB
+    DEFAULT CHARSET = utf8mb4
+    COLLATE = utf8mb4_general_ci;
+
+CREATE INDEX idx_plan_comment_parent_id ON follow_up_plan_comment (parent_id);
+CREATE INDEX idx_plan_comment_resource_id ON follow_up_plan_comment (resource_id);
+
+CREATE TABLE follow_up_record_comment
+(
+    `id`              VARCHAR(32)   NOT NULL COMMENT 'ID',
+    `resource_id`     VARCHAR(32)   NOT NULL COMMENT '跟进记录ID',
+    `parent_id`       VARCHAR(32)            COMMENT '顶层评论ID',
+    `reply_to_user_id` VARCHAR(32)           COMMENT '被回复人用户ID',
+    `content`         VARCHAR(512) NOT NULL COMMENT '评论内容',
+    `organization_id` VARCHAR(32)   NOT NULL COMMENT '组织ID',
+    `create_time`     BIGINT        NOT NULL COMMENT '创建时间',
+    `update_time`     BIGINT        NOT NULL COMMENT '更新时间',
+    `create_user`     VARCHAR(32)   NOT NULL COMMENT '创建人',
+    `update_user`     VARCHAR(32)   NOT NULL COMMENT '更新人',
+    PRIMARY KEY (`id`)
+) COMMENT = '跟进记录评论'
+    ENGINE = InnoDB
+    DEFAULT CHARSET = utf8mb4
+    COLLATE = utf8mb4_general_ci;
+
+CREATE INDEX idx_record_comment_parent_id ON follow_up_record_comment (parent_id);
+CREATE INDEX idx_record_comment_resource_id ON follow_up_record_comment (resource_id);
 
 -- set innodb lock wait timeout to default
 SET SESSION innodb_lock_wait_timeout = DEFAULT;

@@ -227,7 +227,7 @@ function createReadableAgentUiStream(events: AsyncIterable<AgentChatStreamEvent>
             return;
           } else if (event.type === 'done') {
             finish({
-              tokens: event.data?.total,
+              tokens: event.data?.totalTokens,
             });
             return;
           }

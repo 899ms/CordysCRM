@@ -19,6 +19,7 @@ export interface AiModelSaveParams {
 
 export interface AiModelItem extends AiModelSaveParams {
   id: string;
+  dailyTotal: number;
   updateUserName: string;
   createUserName: string;
   createTime: number;
@@ -36,8 +37,8 @@ export interface AiModelOption {
 }
 
 export interface AiModelRouteStrategy {
-  defaultModelId?: string;
-  insightModelId?: string;
-  classifyModelId?: string;
-  autoFallback: boolean;
+  id?: string;
+  chatModels: string[];
+  taskModels: string[];
+  fallback: boolean;
 }

@@ -6,8 +6,8 @@
 <script setup lang="ts">
   import { provide } from 'vue';
 
-  import type { AiChatRuntime } from '../runtime/types';
-  import { AI_CHAT_RUNTIME_KEY } from '../runtime/useAiChatRuntime';
+  import type { AiChatRuntime } from './runtime/types';
+  import { AI_CHAT_RUNTIME_KEY } from './runtime/useAiChatRuntime';
 
   const props = defineProps<{
     runtime: AiChatRuntime;

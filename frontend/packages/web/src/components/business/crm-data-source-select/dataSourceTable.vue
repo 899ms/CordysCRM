@@ -47,6 +47,7 @@
     :custom-form-id="props.sourceType"
     @saved="handleFormCreateSave"
   />
+  <businessTitleDrawer v-model:visible="businessNameDrawerVisible" sourceId="" @load="() => searchData()" />
 </template>
 
 <script setup lang="ts">
@@ -76,6 +77,8 @@
   import CrmBusinessNamePrefix from '@/components/business/crm-business-name-prefix/index.vue';
   import StatusTagSelect from '@/components/business/crm-follow-detail/statusTagSelect.vue';
   import CrmFormCreateDrawer from '@/components/business/crm-form-create-drawer/index.vue';
+  import { formatFormulaResultValue } from '@/components/business/crm-formula/utils';
+  import businessTitleDrawer from '@/views/contract/businessTitle/components/businessTitleDrawer.vue';
   import ContractStatus from '@/views/contract/contractPaymentPlan/components/contractPaymentStatus.vue';
 
   import { getFieldCustomFormList, getOpportunityStageConfig, getOrderStatusConfig } from '@/api/modules';
@@ -461,6 +464,13 @@
       };
     }
 
+    if (field.type === FieldTypeEnum.FORMULA) {
+      return {
+        ...baseColumn,
+        render: (row: any) => formatFormulaResultValue(row[columnKey], field, '-'),
+      };
+    }
+
     return baseColumn;
   }
 
@@ -474,33 +484,37 @@
         tooltip: true,
       },
       resizable: true,
-      render:
-        field.type === FieldTypeEnum.PICTURE
-          ? (row: any) =>
+      render: (row: any) => {
+        if (field.type === FieldTypeEnum.FORMULA) {
+          return formatFormulaResultValue(row[columnKey], field, '-');
+        }
+        if (field.type === FieldTypeEnum.PICTURE) {
+          return h(
+            'div',
+            {
+              class: 'flex items-center',
+            },
+            [
               h(
-                'div',
+                NImageGroup,
+                {},
                 {
-                  class: 'flex items-center',
-                },
-                [
-                  h(
-                    NImageGroup,
-                    {},
-                    {
-                      default: () =>
-                        row[columnKey]?.length
-                          ? (Array.isArray(row[columnKey]) ? row[columnKey] : []).map((_key: string) =>
-                              h(NImage, {
-                                class: 'h-[40px] w-[40px] mr-[4px]',
-                                src: `${PreviewPictureUrl}/${_key}?userId=${userStore.userInfo.id}`,
-                              })
-                            )
-                          : '-',
-                    }
-                  ),
-                ]
-              )
-          : undefined,
+                  default: () =>
+                    row[columnKey]?.length
+                      ? (Array.isArray(row[columnKey]) ? row[columnKey] : []).map((_key: string) =>
+                          h(NImage, {
+                            class: 'h-[40px] w-[40px] mr-[4px]',
+                            src: `${PreviewPictureUrl}/${_key}?userId=${userStore.userInfo.id}`,
+                          })
+                        )
+                      : '-',
+                }
+              ),
+            ]
+          );
+        }
+        return row[columnKey];
+      },
     };
   }
 
@@ -636,12 +650,17 @@
   }
 
   const formCreateVisible = ref(false);
+  const businessNameDrawerVisible = ref(false);
   const realFormKey = computed(() =>
     isCustomForm.value
       ? FormDesignKeyEnum.CUSTOM_FORM
       : fullFormSettingList.find((e) => e.dataSource === props.sourceType)?.formKey
   );
   function handleNewCreate() {
+    if (props.sourceType === FieldDataSourceTypeEnum.BUSINESS_TITLE) {
+      businessNameDrawerVisible.value = true;
+      return;
+    }
     formCreateVisible.value = true;
   }
 

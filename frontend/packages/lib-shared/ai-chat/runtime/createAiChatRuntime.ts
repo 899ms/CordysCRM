@@ -4,6 +4,7 @@ import type { AgentChatConfirmData } from '@lib/shared/models/ai';
 
 import type { AiChatAttachment, AiChatMessage, AiChatMeta, AiChatSubmitPayload } from '../types';
 import type { AiChatRuntime, CreateAiChatRuntimeOptions } from './types';
+import { getAiChatMessageText } from '../utils/message';
 import { Chat } from '@ai-sdk/vue';
 import type { ChatTransport, FileUIPart } from 'ai';
 
@@ -41,12 +42,13 @@ export default function createAiChatRuntime(options: CreateAiChatRuntimeOptions 
   const input = ref(options.initialInput ?? '');
   const attachments = ref<AiChatAttachment[]>([...(options.initialAttachments ?? [])]);
   const selectedMcps = ref([...(options.initialSelectedMcps ?? [])]);
-  const modelName = ref(options.initialModelName ?? '');
   const transport = shallowRef<ChatTransport<AiChatMessage> | undefined>(options.transport);
   const currentConfirm = ref<AgentChatConfirmData>();
+  const editingMessageId = ref('');
+  const editingContent = ref('');
 
   // Chat 负责消息追加、流式合并、停止、重试和编辑后的重新请求。
-  // Runtime 只补充 CRM 需要的输入草稿、附件、模型和 MCP 状态。
+  // Runtime 只补充 CRM 需要的输入草稿、附件和 MCP 状态。
   const chat = shallowRef(
     new Chat<AiChatMessage>({
       id: options.id,
@@ -79,6 +81,10 @@ export default function createAiChatRuntime(options: CreateAiChatRuntimeOptions 
   const canSubmit = computed(() => !loading.value && (input.value.trim().length > 0 || attachments.value.length > 0));
   const canStop = computed(() => ['submitted', 'streaming'].includes(status.value));
   const pendingConfirm = computed(() => currentConfirm.value);
+  const editingMessage = computed(() => chat.value.messages.find((message) => message.id === editingMessageId.value));
+  const canSubmitEdit = computed(
+    () => !loading.value && Boolean(editingMessageId.value) && editingContent.value.trim().length > 0
+  );
 
   function setInput(value: string): void {
     input.value = value;
@@ -92,12 +98,32 @@ export default function createAiChatRuntime(options: CreateAiChatRuntimeOptions 
     selectedMcps.value = value;
   }
 
-  function setModelName(value: string): void {
-    modelName.value = value;
-  }
-
   function removeAttachment(attachmentId: string): void {
     attachments.value = attachments.value.filter((attachment) => attachment.id !== attachmentId);
+  }
+
+  function setEditingContent(value: string): void {
+    editingContent.value = value;
+  }
+
+  function cancelEditMessage(): void {
+    editingMessageId.value = '';
+    editingContent.value = '';
+  }
+
+  function startEditMessage(messageId: string): void {
+    if (loading.value) {
+      return;
+    }
+
+    const targetMessage = chat.value.messages.find((message) => message.id === messageId);
+
+    if (!targetMessage || targetMessage.role !== 'user') {
+      return;
+    }
+
+    editingMessageId.value = messageId;
+    editingContent.value = getAiChatMessageText(targetMessage, '\n').trim();
   }
 
   function appendMessage(message: AiChatMessage): void {
@@ -108,13 +134,19 @@ export default function createAiChatRuntime(options: CreateAiChatRuntimeOptions 
     chat.value.messages = chat.value.messages.map((message) => (message.id === messageId ? patch(message) : message));
   }
 
-  function clear(): void {
+  function reset(nextMessages: AiChatMessage[] = []): void {
     chat.value.stop();
-    chat.value.messages = [];
+    chat.value.messages = nextMessages;
     chat.value.clearError();
     currentConfirm.value = undefined;
     input.value = '';
     attachments.value = [];
+    selectedMcps.value = [];
+    cancelEditMessage();
+  }
+
+  function clear(): void {
+    reset();
   }
 
   async function submit(payload: AiChatSubmitPayload = {}): Promise<void> {
@@ -133,6 +165,7 @@ export default function createAiChatRuntime(options: CreateAiChatRuntimeOptions 
     // 发送后立即清空输入草稿，消息列表由 AI SDK Chat 自己追加 user message。
     input.value = '';
     attachments.value = [];
+    selectedMcps.value = [];
     currentConfirm.value = undefined;
 
     await chat.value.sendMessage(
@@ -172,7 +205,7 @@ export default function createAiChatRuntime(options: CreateAiChatRuntimeOptions 
     await chat.value.regenerate({ messageId });
   }
 
-  async function edit(messageId: string, content: string): Promise<void> {
+  async function edit(messageId: string, content: string, options: AiChatSubmitPayload['options'] = {}): Promise<void> {
     if (loading.value) {
       return;
     }
@@ -183,7 +216,10 @@ export default function createAiChatRuntime(options: CreateAiChatRuntimeOptions 
       return;
     }
 
-    const { metadata } = targetMessage;
+    const metadata: AiChatMeta = {
+      ...targetMessage.metadata,
+      mcps: options.mcps ?? targetMessage.metadata?.mcps,
+    };
 
     await chat.value.sendMessage(
       {
@@ -204,6 +240,18 @@ export default function createAiChatRuntime(options: CreateAiChatRuntimeOptions 
     );
   }
 
+  async function submitEditMessage(): Promise<void> {
+    if (!canSubmitEdit.value) {
+      return;
+    }
+
+    const messageId = editingMessageId.value;
+    const content = editingContent.value.trim();
+
+    cancelEditMessage();
+    await edit(messageId, content);
+  }
+
   async function confirm(data: AgentChatConfirmData, answers: Record<string, string>): Promise<void> {
     await options.onConfirm?.(data, answers);
     currentConfirm.value = undefined;
@@ -215,7 +263,6 @@ export default function createAiChatRuntime(options: CreateAiChatRuntimeOptions 
       input,
       attachments,
       selectedMcps,
-      modelName,
       status,
       loading,
       streaming,
@@ -223,21 +270,29 @@ export default function createAiChatRuntime(options: CreateAiChatRuntimeOptions 
       canSubmit,
       canStop,
       pendingConfirm,
+      editingMessageId,
+      editingContent,
+      editingMessage,
+      canSubmitEdit,
     },
     chat,
     transport,
     setInput,
     setAttachments,
     setSelectedMcps,
-    setModelName,
     removeAttachment,
     submit,
     stop,
     retry,
     edit,
+    startEditMessage,
+    cancelEditMessage,
+    setEditingContent,
+    submitEditMessage,
     confirm,
     appendMessage,
     updateMessage,
+    reset,
     clear,
   };
 
