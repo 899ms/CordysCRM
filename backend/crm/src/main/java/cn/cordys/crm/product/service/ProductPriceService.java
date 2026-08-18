@@ -511,6 +511,7 @@ public class ProductPriceService {
             ImportRequest request) {
 
         AtomicLong initPos = new AtomicLong(getNextOrder(currentOrg));
+        ModuleFormConfigDTO priceFormConfig = moduleFormCacheService.getBusinessFormConfig(FormKey.PRICE.getKey(), currentOrg);
 
         CustomImportAfterDoConsumer<ProductPrice, BaseResourceSubField> afterDo =
                 (prices, priceFields, priceFieldBlobs) -> {
@@ -598,7 +599,7 @@ public class ProductPriceService {
                             ids.forEach(id -> {
                                 ProductPrice originDate = originMaps.get(id);
                                 ProductPrice modifiedDate = modifiedMaps.get(id);
-                                baseService.handleUpdateLog(originDate, modifiedDate, originFieldValueMap.get(id), modifiedFieldValueMap.get(id), id, modifiedDate.getName());
+                                baseService.handleUpdateLogWithSubTable(originDate, modifiedDate, originFieldValueMap.get(id), modifiedFieldValueMap.get(id), id, modifiedDate.getName(), Translator.get("products_info"), priceFormConfig);
                                 LogContextInfo contextInfo = OperationLogContext.getContext();
                                 if (contextInfo != null) {
                                     LogDTO logDTO = new LogDTO(currentOrg, id, currentUser, LogType.UPDATE, LogModule.PRODUCT_PRICE_MANAGEMENT, modifiedDate.getName());
@@ -806,5 +807,23 @@ public class ProductPriceService {
 
         // 3 复制附件实体
         attachmentService.batchCopyOfIdMap(attachmentIdMap, targetId, currentUser);
+    }
+
+
+    /**
+     * 获取数据
+     *
+     * @param resourceId
+     * @param fieldId
+     * @param fieldValue
+     * @return
+     */
+    public Set<String> getData(Object resourceId, String fieldId, Object fieldValue) {
+        LambdaQueryWrapper<ProductPriceField> priceFieldLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        priceFieldLambdaQueryWrapper.eq(ProductPriceField::getResourceId, resourceId)
+                .eq(ProductPriceField::getFieldId, fieldId)
+                .eq(ProductPriceField::getFieldValue, fieldValue);
+        List<ProductPriceField> productPriceFields = productPriceFieldMapper.selectListByLambda(priceFieldLambdaQueryWrapper);
+        return productPriceFields.stream().map(ProductPriceField::getBizId).collect(Collectors.toSet());
     }
 }

@@ -8,6 +8,7 @@ import cn.cordys.common.util.CommonBeanFactory;
 import cn.cordys.common.util.Translator;
 import cn.cordys.crm.system.constants.FieldType;
 import cn.cordys.crm.system.constants.ImportType;
+import cn.cordys.crm.system.dto.field.DatasourceField;
 import cn.cordys.crm.system.dto.field.base.BaseField;
 import cn.cordys.crm.system.dto.field.base.SubField;
 import cn.cordys.excel.domain.ExcelErrData;
@@ -19,6 +20,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -51,6 +53,7 @@ public class CustomFieldCheckEventListener extends AnalysisEventListener<Map<Int
      * 唯一校验&&数据库属性值缓存&&Excel列值缓存
      */
     private final Map<String, BaseField> uniques = new HashMap<>();
+    private final Map<String, BigDecimal> numberMax = new HashMap<>();
     private final Map<String, Set<BaseResourceSubField>> uniqueCheckSet = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> excelValueCache = new ConcurrentHashMap<>();
     protected final CommonMapper commonMapper;
@@ -90,6 +93,8 @@ public class CustomFieldCheckEventListener extends AnalysisEventListener<Map<Int
     protected int maxHeadRow;
     protected final Map<Integer, Map<Integer, String>> mergeRowDataMap;
     protected Map<Integer, String> firstHeadMap = new HashMap<>();
+    private static final BigDecimal MAX_AMOUNT = new BigDecimal("9999999999");
+    protected Map<String, BaseField> priceSubRefFieldMap = new HashMap<>();
 
     public CustomFieldCheckEventListener(List<BaseField> fields, String sourceTable, String fieldTable, String currentOrg, String importType) {
         this(fields, sourceTable, fieldTable, currentOrg, null, null, importType);
@@ -109,11 +114,35 @@ public class CustomFieldCheckEventListener extends AnalysisEventListener<Map<Int
                     this.fieldMap.put(subField.getName() + "_" + f.getName(), f);
                     refSubMap.put(subField.getName() + "_" + f.getName(), subField.getId());
                     setCheckLimit(f, subField.getName());
+                    setNumberMax(f, subField.getName());
+                    if (f instanceof DatasourceField priceSource) {
+                        if (Strings.CI.equals(priceSource.getDataSourceType(), "PRICE")) {
+                            Set<String> ids = priceSource.getShowFields().stream()
+                                    .map(subfield -> priceSource.getId() + "_ref_" + subfield)
+                                    .collect(Collectors.toSet());
+
+                            Map<String, BaseField> refFieldMap = priceSource.getRefFields().stream()
+                                    .filter(refField -> ids.contains(refField.getId()) && StringUtils.isNotBlank(refField.getSubTableFieldId()))
+                                    .collect(Collectors.toMap(
+                                            BaseField::getId,
+                                            Function.identity()
+                                    ));
+
+                            Map<String, BaseField> priceSubRefFieldMap = subField.getSubFields().stream()
+                                    .filter(subBasefield -> refFieldMap.containsKey(subBasefield.getId()))
+                                    .collect(Collectors.toMap(
+                                            subBasefield -> subField.getName() + "_" + subBasefield.getName(),
+                                            subBasefield -> refFieldMap.get(subBasefield.getId())
+                                    ));
+                            this.priceSubRefFieldMap.putAll(priceSubRefFieldMap);
+                        }
+                    }
                 }
                 continue;
             }
             this.fieldMap.put(field.getName(), field);
             setCheckLimit(field, null);
+            setNumberMax(field, null);
         }
         this.sourceTable = sourceTable;
         this.currentOrg = currentOrg;
@@ -234,6 +263,10 @@ public class CustomFieldCheckEventListener extends AnalysisEventListener<Map<Int
                     rowData.get(k).length() > fieldLenLimit.get(v)) {
                 errText.append(v).append(Translator.getWithArgs("over.length", fieldLenLimit.get(v))).append(";");
             }
+            if (numberMax.containsKey(v) && checkNumberMax(rowData.get(k), numberMax.get(v))) {
+                errText.append(v).append(Translator.getWithArgs("exceed.max", numberMax.get(v))).append(";");
+            }
+
         });
         if (StringUtils.isNotEmpty(errText)) {
             ExcelErrData excelErrData = new ExcelErrData(rowIndex,
@@ -324,6 +357,26 @@ public class CustomFieldCheckEventListener extends AnalysisEventListener<Map<Int
         return false;
     }
 
+
+    /**
+     * 最大值校验
+     *
+     * @param val
+     * @param max
+     * @return
+     */
+    private boolean checkNumberMax(String val, BigDecimal max) {
+        if (StringUtils.isNotBlank(val)) {
+            try {
+                BigDecimal bigDecimal = new BigDecimal(val);
+                return bigDecimal.compareTo(max) > 0;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        return false;
+    }
+
     /**
      * 表头是否非法
      *
@@ -363,6 +416,19 @@ public class CustomFieldCheckEventListener extends AnalysisEventListener<Map<Int
         }
         if (Strings.CS.equals(field.getType(), FieldType.TEXTAREA.name())) {
             fieldLenLimit.put(StringUtils.isNotEmpty(subFieldName) ? subFieldName + "_" + field.getName() : field.getName(), 3000);
+        }
+    }
+
+
+    /**
+     * 设置数字类型最大值
+     *
+     * @param field
+     * @param subFieldName
+     */
+    private void setNumberMax(BaseField field, String subFieldName) {
+        if (Strings.CI.equalsAny(field.getType(), FieldType.INPUT_NUMBER.name(), FieldType.FORMULA.name())) {
+            numberMax.put(StringUtils.isNotEmpty(subFieldName) ? subFieldName + "_" + field.getName() : field.getName(), MAX_AMOUNT);
         }
     }
 

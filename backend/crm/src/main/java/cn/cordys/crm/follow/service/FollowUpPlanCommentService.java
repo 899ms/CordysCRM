@@ -3,8 +3,9 @@ package cn.cordys.crm.follow.service;
 import cn.cordys.aspectj.annotation.OperationLog;
 import cn.cordys.aspectj.constants.LogModule;
 import cn.cordys.aspectj.constants.LogType;
+import cn.cordys.common.constants.ModuleKey;
 import cn.cordys.common.exception.GenericException;
-import cn.cordys.common.pager.Pager;
+import cn.cordys.common.pager.PagerWithCommentCount;
 import cn.cordys.common.util.Translator;
 import cn.cordys.crm.follow.constants.FollowUpCommentTargetType;
 import cn.cordys.crm.follow.domain.FollowUpPlan;
@@ -17,6 +18,8 @@ import cn.cordys.crm.follow.mapper.ExtFollowUpPlanMapper;
 import cn.cordys.crm.system.constants.NotificationConstants;
 import cn.cordys.mybatis.BaseMapper;
 import jakarta.annotation.Resource;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
@@ -33,27 +36,24 @@ public class FollowUpPlanCommentService extends BaseCommentService<FollowUpPlanC
     private ExtFollowUpPlanMapper extPlanMapper;
 
     @Override
-    public Pager<List<CommentResponse>> page(CommentPageRequest request, String orgId) {
+    public PagerWithCommentCount<List<CommentResponse>> page(CommentPageRequest request, String orgId) {
         return super.page(request, orgId);
     }
 
     @Override
-    @OperationLog(module = LogModule.FOLLOW_UP_PLAN, type = LogType.ADD,
-            resourceId = "{#request.targetId}", resourceName = "{#request.content}")
+    @OperationLog(module = LogModule.FOLLOW_UP_PLAN, type = LogType.UPDATE)
     public FollowUpPlanComment add(CommentAddRequest request, String userId, String orgId) {
         return super.add(request, userId, orgId);
     }
 
     @Override
-    @OperationLog(module = LogModule.FOLLOW_UP_PLAN, type = LogType.UPDATE,
-            resourceId = "{#request.id}", resourceName = "{#request.content}")
+    @OperationLog(module = LogModule.FOLLOW_UP_PLAN, type = LogType.UPDATE)
     public FollowUpPlanComment update(CommentUpdateRequest request, String userId, String orgId) {
         return super.update(request, userId, orgId);
     }
 
     @Override
-    @OperationLog(module = LogModule.FOLLOW_UP_PLAN, type = LogType.DELETE,
-            resourceId = "{#id}", resourceName = "{#id}")
+    @OperationLog(module = LogModule.FOLLOW_UP_PLAN, type = LogType.UPDATE)
     public void delete(String id, String userId, String orgId) {
         super.delete(id, userId, orgId);
     }
@@ -74,18 +74,38 @@ public class FollowUpPlanCommentService extends BaseCommentService<FollowUpPlanC
     }
 
     @Override
-    protected String getNotificationModule() {
-        return NotificationConstants.Module.FOLLOW_UP_PLAN;
+    protected String getCommentMentionTable() {
+        return "follow_up_plan_comment_mention";
     }
 
     @Override
-    protected String getCommentAddedEvent() {
-        return NotificationConstants.Event.FOLLOW_UP_PLAN_COMMENT_ADDED;
+    protected String getCommentAddedEvent(String resourceId) {
+        FollowUpPlan plan = planMapper.selectByPrimaryKey(resourceId);
+        if (plan != null) {
+            if (Strings.CI.equals(plan.getType(), ModuleKey.CLUE.name())) {
+                return NotificationConstants.Event.CLUE_FOLLOW_UP_PLAN_COMMENT_ADDED;
+            } else if (StringUtils.isNotBlank(plan.getOpportunityId())) {
+                return NotificationConstants.Event.OPPORTUNITY_FOLLOW_UP_PLAN_COMMENT_ADDED;
+            } else {
+                return NotificationConstants.Event.CUSTOMER_FOLLOW_UP_PLAN_COMMENT_ADDED;
+            }
+        }
+        return NotificationConstants.Event.CUSTOMER_FOLLOW_UP_PLAN_COMMENT_ADDED;
     }
 
     @Override
-    protected String getCommentMentionedEvent() {
-        return NotificationConstants.Event.FOLLOW_UP_PLAN_COMMENT_MENTIONED;
+    protected String getCommentMentionedEvent(String resourceId) {
+        FollowUpPlan plan = planMapper.selectByPrimaryKey(resourceId);
+        if (plan != null) {
+            if (Strings.CI.equals(plan.getType(), ModuleKey.CLUE.name())) {
+                return NotificationConstants.Event.CLUE_FOLLOW_UP_PLAN_COMMENT_MENTIONED;
+            } else if (StringUtils.isNotBlank(plan.getOpportunityId())) {
+                return NotificationConstants.Event.OPPORTUNITY_FOLLOW_UP_PLAN_COMMENT_MENTIONED;
+            } else {
+                return NotificationConstants.Event.CUSTOMER_FOLLOW_UP_PLAN_COMMENT_MENTIONED;
+            }
+        }
+        return NotificationConstants.Event.CUSTOMER_FOLLOW_UP_PLAN_COMMENT_MENTIONED;
     }
 
     @Override
@@ -94,11 +114,11 @@ public class FollowUpPlanCommentService extends BaseCommentService<FollowUpPlanC
     }
 
     @Override
-    protected CommentResourceInfo getResource(String resourceId, String orgId, String userId) {
+    protected CommentResourceInfo getNoticeResource(String resourceId, String orgId) {
         FollowUpPlan plan = planMapper.selectByPrimaryKey(resourceId);
         if (plan == null || !Objects.equals(plan.getOrganizationId(), orgId)) {
             throw new GenericException(Translator.get("follow.comment.target_not_found"));
         }
-        return buildTargetInfo(plan.getOwner(), plan.getClueId(), plan.getCustomerId(), plan.getOpportunityId());
+        return buildTargetInfo(plan.getType(), plan.getOwner(), plan.getClueId(), plan.getCustomerId(), plan.getOpportunityId());
     }
 }

@@ -48,7 +48,6 @@ CREATE TABLE agent_task
     `execution_condition` TEXT(255) COMMENT '执行条件',
     `execution_action`    TEXT(255) COMMENT '执行动作',
     `confirmation_level`  VARCHAR(20)  NOT NULL COMMENT '确认级别',
-    `applicable_roles`    VARCHAR(1000) COMMENT '适用角色',
     `applicable_model`    VARCHAR(32) COMMENT '适用模型',
     `enable`              TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '启用状态',
     `organization_id`     VARCHAR(32)  NOT NULL COMMENT '组织ID',
@@ -74,6 +73,7 @@ CREATE TABLE agent_action_suggestion
     `actions`     VARCHAR(255) COMMENT '行动操作项',
     `create_time` BIGINT      NOT NULL COMMENT '创建时间',
     `create_user` VARCHAR(32) NOT NULL COMMENT '创建人',
+    `status` VARCHAR(10) NOT NULL   COMMENT '状态' ,
     PRIMARY KEY (id)
 ) COMMENT = '行动建议'
     ENGINE = InnoDB
@@ -93,6 +93,7 @@ CREATE TABLE agent_action_approve
     `organization_id` VARCHAR(32) NOT NULL   COMMENT '组织ID' ,
     `create_time` BIGINT      NOT NULL COMMENT '创建时间',
     `create_user` VARCHAR(32) NOT NULL COMMENT '创建人',
+    `status` VARCHAR(10) NOT NULL   COMMENT '状态' ,
     PRIMARY KEY (id)
 ) COMMENT = '行动审核'
     ENGINE = InnoDB
@@ -190,13 +191,13 @@ CREATE TABLE agent_term_discovery(
     COLLATE = utf8mb4_general_ci;
 
 CREATE TABLE agent_task_execute_log(
-    `id` VARCHAR(32) NOT NULL   COMMENT 'id' ,
+    `id` VARCHAR(32) NOT NULL   COMMENT 'ID' ,
     `task_id` VARCHAR(32) NOT NULL   COMMENT '任务ID' ,
-    `run_id` VARCHAR(32) NOT NULL   COMMENT '执行ID' ,
+    `run_id` VARCHAR(100) NOT NULL   COMMENT '执行ID' ,
     `execute_time` BIGINT NOT NULL   COMMENT '执行时间' ,
     `execute_reason` VARCHAR(500) NOT NULL   COMMENT '触发原因' ,
-    `result` VARCHAR(255) NOT NULL   COMMENT '结果' ,
-    `confirm_user` VARCHAR(32)    COMMENT '确认用户' ,
+    `status` VARCHAR(50) NOT NULL   COMMENT '状态' ,
+    `result` VARCHAR(255)    COMMENT '结果' ,
     PRIMARY KEY (id)
 )  COMMENT = '执行记录'
     ENGINE = InnoDB
@@ -204,7 +205,6 @@ CREATE TABLE agent_task_execute_log(
     COLLATE = utf8mb4_general_ci;
 
 CREATE INDEX idx_task_id ON agent_task_execute_log(task_id ASC);
-CREATE INDEX idx_confirm_user ON agent_task_execute_log(confirm_user ASC);
 
 CREATE TABLE agent_model_usage(
     `id` VARCHAR(32) NOT NULL   COMMENT 'ID' ,
@@ -285,8 +285,8 @@ CREATE TABLE follow_up_plan_comment
     DEFAULT CHARSET = utf8mb4
     COLLATE = utf8mb4_general_ci;
 
-CREATE INDEX idx_plan_comment_parent_id ON follow_up_plan_comment (parent_id);
-CREATE INDEX idx_plan_comment_resource_id ON follow_up_plan_comment (resource_id);
+CREATE INDEX idx_parent_id ON follow_up_plan_comment (parent_id);
+CREATE INDEX idx_resource_id ON follow_up_plan_comment (resource_id);
 
 CREATE TABLE follow_up_record_comment
 (
@@ -306,8 +306,42 @@ CREATE TABLE follow_up_record_comment
     DEFAULT CHARSET = utf8mb4
     COLLATE = utf8mb4_general_ci;
 
-CREATE INDEX idx_record_comment_parent_id ON follow_up_record_comment (parent_id);
-CREATE INDEX idx_record_comment_resource_id ON follow_up_record_comment (resource_id);
+CREATE INDEX idx_parent_id ON follow_up_record_comment (parent_id);
+CREATE INDEX idx_resource_id ON follow_up_record_comment (resource_id);
+
+CREATE TABLE follow_up_plan_comment_mention
+(
+    `id`         VARCHAR(32) NOT NULL COMMENT 'ID',
+    `comment_id` VARCHAR(32) NOT NULL COMMENT '跟进计划评论ID',
+    `user_id`    VARCHAR(32) NOT NULL COMMENT '被@用户ID',
+    PRIMARY KEY (`id`)
+) COMMENT = '跟进计划评论@用户关系'
+    ENGINE = InnoDB
+    DEFAULT CHARSET = utf8mb4
+    COLLATE = utf8mb4_general_ci;
+
+CREATE INDEX idx_comment_id ON follow_up_plan_comment_mention (comment_id);
+
+CREATE TABLE follow_up_record_comment_mention
+(
+    `id`         VARCHAR(32) NOT NULL COMMENT 'ID',
+    `comment_id` VARCHAR(32) NOT NULL COMMENT '跟进记录评论ID',
+    `user_id`    VARCHAR(32) NOT NULL COMMENT '被@用户ID',
+    PRIMARY KEY (`id`)
+) COMMENT = '跟进记录评论@用户关系'
+    ENGINE = InnoDB
+    DEFAULT CHARSET = utf8mb4
+    COLLATE = utf8mb4_general_ci;
+
+CREATE INDEX idx_comment_id ON follow_up_record_comment_mention (comment_id);
+
+
+-- 设置非必填
+ALTER TABLE follow_up_plan MODIFY COLUMN `method` varchar(32) NULL COMMENT '跟进方式';
+ALTER TABLE follow_up_plan MODIFY COLUMN estimated_time bigint NULL COMMENT '预计开始时间';
+ALTER TABLE follow_up_record MODIFY COLUMN follow_time bigint NULL COMMENT '跟进时间';
+ALTER TABLE follow_up_record MODIFY COLUMN follow_method varchar(32) NULL COMMENT '跟进方式';
+
 
 -- set innodb lock wait timeout to default
 SET SESSION innodb_lock_wait_timeout = DEFAULT;

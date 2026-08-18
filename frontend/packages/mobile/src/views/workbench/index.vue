@@ -27,7 +27,11 @@
           <span>{{ t('mine.changePasswordTip') }}</span>
           <span class="ml-[8px] text-[var(--primary-8)]" @click="changePassword">{{ t('mine.changePassword') }}</span>
         </van-notice-bar>
-        <CrmSegmentTabs v-model="activeWorkbenchTab" :options="workbenchTabOptions" />
+        <CrmSegmentTabs
+          v-model="activeWorkbenchTab"
+          :options="workbenchTabOptions"
+          @change="handleWorkbenchTabChange"
+        />
         <van-cell-group
           v-if="activeWorkbenchTab === WorkbenchHomeTabEnum.DASHBOARD"
           class="px-[20px] py-[16px]"
@@ -134,12 +138,9 @@
         </van-cell-group>
       </div>
 
-      <div v-else="activeWorkbenchTab === WorkbenchHomeTabEnum.SMART" class="flex-1 overflow-auto px-[12px]"> </div>
+      <SmartWorkbench v-else-if="activeWorkbenchTab === WorkbenchHomeTabEnum.SMART" />
     </div>
     <AiMobileEntryComposer v-if="showAiEntryComposer" @submit="goAiChat" />
-    <div v-if="showAiFloatingButton" class="ai-floating-button" @click="goAiChat()">
-      <CrmIcon name="iconicon_bot" width="24px" height="24px" color="var(--primary-8)" />
-    </div>
   </div>
 </template>
 
@@ -158,10 +159,13 @@
   import CrmAvatar from '@/components/business/crm-avatar/index.vue';
   import followPlanList from '@/views/workbench/follow/followPlanList.vue';
   import followRecordList from '@/views/workbench/follow/followRecordList.vue';
+  import SmartWorkbench from '@/views/workbench/smart/index.vue';
 
   import { getTodoStatistic } from '@/api/modules';
   import useAppStore from '@/store/modules/app';
+  import useLicenseStore from '@/store/modules/setting/license';
   import useUserStore from '@/store/modules/user';
+  import showNoLicenseDialog from '@/utils/license';
 
   import { CommonRouteEnum, MineRouteEnum, WorkbenchRouteEnum } from '@/enums/routeEnum';
 
@@ -172,6 +176,7 @@
   });
 
   const appStore = useAppStore();
+  const licenseStore = useLicenseStore();
   const userStore = useUserStore();
   const { t } = useI18n();
   const router = useRouter();
@@ -199,7 +204,11 @@
     DASHBOARD = 'dashboard',
   }
 
-  const activeWorkbenchTab = ref(WorkbenchHomeTabEnum.SMART);
+  function getDefaultWorkbenchTab(): WorkbenchHomeTabEnum {
+    return licenseStore.hasLicense() ? WorkbenchHomeTabEnum.SMART : WorkbenchHomeTabEnum.DASHBOARD;
+  }
+
+  const activeWorkbenchTab = ref(getDefaultWorkbenchTab());
   const workbenchTabOptions = computed(() => [
     {
       label: t('workbench.smartWorkbench'),
@@ -210,6 +219,15 @@
       value: WorkbenchHomeTabEnum.DASHBOARD,
     },
   ]);
+
+  function handleWorkbenchTabChange(value: string | number): void {
+    if (value !== WorkbenchHomeTabEnum.SMART || licenseStore.hasLicense()) {
+      return;
+    }
+
+    activeWorkbenchTab.value = WorkbenchHomeTabEnum.DASHBOARD;
+    showNoLicenseDialog(t);
+  }
 
   function changePassword() {
     router.push({
@@ -268,7 +286,6 @@
 
   const hasValidApiKey = computed(() => userStore.apiKeyList.some((key) => !key.isExpire && key.enable));
   const showAiEntryComposer = computed(() => activeWorkbenchTab.value === WorkbenchHomeTabEnum.SMART);
-  const showAiFloatingButton = computed(() => activeWorkbenchTab.value === WorkbenchHomeTabEnum.DASHBOARD);
 
   function goAgent() {
     router.push({ name: WorkbenchRouteEnum.WORKBENCH_AGENT });
@@ -330,6 +347,10 @@
     userStore.initApiKeyList();
     initTodoStatistic();
   });
+
+  onActivated(() => {
+    activeWorkbenchTab.value = getDefaultWorkbenchTab();
+  });
 </script>
 
 <style lang="less" scoped>
@@ -363,20 +384,6 @@
     &:active {
       background-color: var(--text-n9);
     }
-  }
-  .ai-floating-button {
-    position: fixed;
-    right: 20px;
-    bottom: 80px;
-    z-index: 8;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: var(--primary-7);
-    box-shadow: 0 6px 35px 6px #6467671a;
   }
   :deep(.workbench-follow-item) {
     .follow-item-content {

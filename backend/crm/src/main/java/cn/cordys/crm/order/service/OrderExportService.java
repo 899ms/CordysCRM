@@ -61,7 +61,7 @@ public class OrderExportService extends BaseExportService {
         var result = buildExportMergeResult(taskId, exportParam, dataList,
                 OrderListResponse::getModuleFields,
                 (detail, fieldParam, metas, cache) -> buildDataWithSub(detail.getModuleFields(), fieldParam, metas,
-                        getSystemFieldMap(detail, metas, stageConfigMap), cache));
+                        getSystemFieldMap(detail, metas, stageConfigMap, exportParam.getLocale()), cache));
         result.setQueryCount(queryCount);
         return result;
     }
@@ -74,7 +74,8 @@ public class OrderExportService extends BaseExportService {
         List<OrderListResponse> exportList;
         if (CollectionUtils.isNotEmpty(exportParam.getSelectIds())) {
             exportList = extOrderMapper.getListByIds(exportParam.getSelectIds(), userId, orgId, deptDataPermission);
-            return Pair.of(exportList, exportList.size());
+            List<OrderListResponse> orderListResponses = filterExportPermission(exportList, orgId);
+            return Pair.of(orderListResponses, orderListResponses.size());
         } else {
             var request = (OrderPageRequest) exportParam.getPageRequest();
             PageHelper.startPage(request.getCurrent(), request.getPageSize(), false);
@@ -100,20 +101,21 @@ public class OrderExportService extends BaseExportService {
     }
 
 
-    public LinkedHashMap<String, Object> getSystemFieldMap(OrderListResponse data, List<FieldExportMeta> exportMetas, Map<String, String> stageConfigMap) {
+    public LinkedHashMap<String, Object> getSystemFieldMap(OrderListResponse data, List<FieldExportMeta> exportMetas, Map<String, String> stageConfigMap, Locale locale) {
         LinkedHashMap<String, Object> systemFieldMap = new LinkedHashMap<>();
         systemFieldMap.put("name", data.getName());
         systemFieldMap.put("id", data.getId());
         systemFieldMap.put("number", data.getNumber());
         systemFieldMap.put("customerId", data.getCustomerName());
         systemFieldMap.put("contractId", data.getContractName());
+        systemFieldMap.put("departmentId", data.getDepartmentName());
         systemFieldMap.put("owner", data.getOwnerName());
         systemFieldMap.put("amount", data.getAmount());
         if (StringUtils.isNotBlank(data.getStage())) {
             systemFieldMap.put("stage", stageConfigMap.get(data.getStage()));
         }
         if (StringUtils.isNotBlank(data.getApprovalStatus())) {
-            systemFieldMap.put("approvalStatus", Translator.get("contract.approval_status." + data.getApprovalStatus().toLowerCase(), Locale.SIMPLIFIED_CHINESE));
+            systemFieldMap.put("approvalStatus", Translator.get("contract.approval_status." + data.getApprovalStatus().toLowerCase(), locale));
         }
         systemFieldMap.put("createUser", data.getCreateUserName());
         systemFieldMap.put("createTime", TimeUtils.getDateTimeStr(data.getCreateTime()));

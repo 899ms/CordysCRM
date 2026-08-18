@@ -92,6 +92,7 @@
   import { formKeyMap } from '../crm-data-source-select/config';
   import { isCustomDataSourceType } from '../crm-data-source-select/utils';
   import { FormulaDataSourceMap } from '../crm-formula/formula-runtime/types';
+  import { formatFormulaResultValue } from '../crm-formula/utils';
   import { safeParseFormula } from '../crm-formula-editor/utils';
   import { getFormConfigApiMap, multipleValueTypeList } from './config';
 
@@ -296,9 +297,7 @@
               }
               if (targetField.showFields?.length) {
                 // 无值清空显示字段
-                const showFields = fieldList.value.filter((f) =>
-                  targetField.showFields?.includes(f.id.split('_ref_')[1])
-                );
+                const showFields = fieldList.value.filter((f) => targetField.showFields?.includes(getFieldItemId(f)));
                 showFields.forEach((field) => {
                   formDetail.value[field.id] = '';
                 });
@@ -638,7 +637,10 @@
             ? target?.[specialBusinessKeyMap[field.businessKey]]
             : target?.[field.businessKey || getFieldItemId(field)];
 
-        formDetail.value[field.id] = getDisplayFieldText(field, fieldValue);
+        formDetail.value[field.id] =
+          field.type === FieldTypeEnum.FORMULA
+            ? formatFormulaResultValue(fieldValue, field)
+            : getDisplayFieldText(field, fieldValue);
       });
     }
 

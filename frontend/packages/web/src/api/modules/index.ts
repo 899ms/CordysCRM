@@ -83,6 +83,7 @@ export const {
   importCustomForm,
   exportCustomFormAll,
   exportCustomFormSelected,
+  getCustomFormCreatePermission,
 } = customFormApi;
 
 export const {
@@ -645,6 +646,7 @@ export const {
   updateConfigSynchronization,
   getTenderConfig,
   getAiModelList,
+  getAiModelDetail,
   getAiModelOptions,
   addAiModel,
   updateAiModel,
@@ -825,10 +827,23 @@ export const {
   streamAgentChat,
   cancelAgentChat,
   confirmAgentChat,
+  likeAgentChat,
+  dislikeAgentChat,
+  getSmartDataOverview,
+  regenerateSmartDataOverview,
+  getSmartAiSummary,
+  regenerateSmartAiSummary,
+  getAgentActionSuggestionPage,
+  ignoreAgentActionSuggestion,
+  submitAgentActionSuggestion,
+  getAgentActionApprovePage,
+  ignoreAgentActionApprove,
+  confirmAgentActionApprove,
   getAgentConversationPage,
   getAgentConversationDetail,
   deleteAgentConversation,
   renameAgentConversation,
+  getAgentConversationMcpTools,
 } = aiApi;
 
 export const { getSystemVersion, changeLocaleBackEnd } = sysApi;

@@ -1,15 +1,28 @@
 import {
+  AgentActionApproveConfirmUrl,
+  AgentActionApproveIgnoreUrl,
+  AgentActionApprovePageUrl,
+  AgentActionSuggestionIgnoreUrl,
+  AgentActionSuggestionPageUrl,
+  AgentActionSuggestionSubmitUrl,
   AgentChatCancelUrl,
   AgentChatConfirmUrl,
   AgentChatStreamUrl,
+  AgentChatUrl,
   AgentConversationDeleteUrl,
   AgentConversationDetailUrl,
+  AgentConversationMcpToolsUrl,
   AgentConversationPageUrl,
   AgentConversationRenameUrl,
+  SmartAiSummaryRegenerateUrl,
+  SmartAiSummaryUrl,
+  SmartDataOverviewRegenerateUrl,
+  SmartDataOverviewUrl,
 } from '../requrls/ai';
 import { useI18n } from '../../hooks/useI18n';
 import { getToken } from '../../method/auth';
 import type { CordysAxios } from '../http/Axios';
+import type { CommonList, TableQueryParams } from '../../models/common';
 import type {
   AgentChatCancelParams,
   AgentChatConfirmData,
@@ -20,6 +33,10 @@ import type {
   AgentChatStreamOptions,
   AgentChatStreamParams,
   AgentConversationQueryRequest,
+  AgentConversationMcpToolItem,
+  AgentActionApproveItem,
+  AgentActionSuggestionItem,
+  SmartFocusParams,
 } from '../../models/ai';
 
 interface SseBlock {
@@ -299,6 +316,14 @@ export default function useAiApi(CDR: CordysAxios) {
     });
   }
 
+  function likeAgentChat(runId: string) {
+    return CDR.post({ url: `${AgentChatUrl}/${runId}/like` });
+  }
+
+  function dislikeAgentChat(runId: string) {
+    return CDR.post({ url: `${AgentChatUrl}/${runId}/dislike` });
+  }
+
   function getAgentConversationPage(data: AgentConversationQueryRequest) {
     return CDR.post({ url: AgentConversationPageUrl, data });
   }
@@ -318,13 +343,70 @@ export default function useAiApi(CDR: CordysAxios) {
     });
   }
 
+  function getAgentConversationMcpTools() {
+    return CDR.get<AgentConversationMcpToolItem[]>({ url: AgentConversationMcpToolsUrl });
+  }
+
+  function getSmartDataOverview() {
+    return CDR.post<string>({ url: SmartDataOverviewUrl });
+  }
+
+  function regenerateSmartDataOverview() {
+    return CDR.post<string>({ url: SmartDataOverviewRegenerateUrl });
+  }
+
+  function getSmartAiSummary(data: SmartFocusParams) {
+    return CDR.post<string>({ url: SmartAiSummaryUrl, data });
+  }
+
+  function regenerateSmartAiSummary(data: SmartFocusParams) {
+    return CDR.post<string>({ url: SmartAiSummaryRegenerateUrl, data });
+  }
+
+  function getAgentActionSuggestionPage(data: TableQueryParams) {
+    return CDR.post<CommonList<AgentActionSuggestionItem>>({ url: AgentActionSuggestionPageUrl, data });
+  }
+
+  function ignoreAgentActionSuggestion(id: string) {
+    return CDR.post({ url: `${AgentActionSuggestionIgnoreUrl}/${id}` });
+  }
+
+  function submitAgentActionSuggestion(id: string, label: string) {
+    return CDR.post({ url: `${AgentActionSuggestionSubmitUrl}/${id}`, params: { label } });
+  }
+
+  function getAgentActionApprovePage(data: TableQueryParams) {
+    return CDR.post<CommonList<AgentActionApproveItem>>({ url: AgentActionApprovePageUrl, data });
+  }
+
+  function ignoreAgentActionApprove(id: string) {
+    return CDR.post({ url: `${AgentActionApproveIgnoreUrl}/${id}` });
+  }
+
+  function confirmAgentActionApprove(id: string) {
+    return CDR.post({ url: `${AgentActionApproveConfirmUrl}/${id}` });
+  }
+
   return {
     streamAgentChat,
     cancelAgentChat,
     confirmAgentChat,
+    likeAgentChat,
+    dislikeAgentChat,
     getAgentConversationPage,
     getAgentConversationDetail,
     deleteAgentConversation,
     renameAgentConversation,
+    getAgentConversationMcpTools,
+    getSmartDataOverview,
+    regenerateSmartDataOverview,
+    getSmartAiSummary,
+    regenerateSmartAiSummary,
+    getAgentActionSuggestionPage,
+    ignoreAgentActionSuggestion,
+    submitAgentActionSuggestion,
+    getAgentActionApprovePage,
+    ignoreAgentActionApprove,
+    confirmAgentActionApprove,
   };
 }

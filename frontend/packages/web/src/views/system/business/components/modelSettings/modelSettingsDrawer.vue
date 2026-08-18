@@ -19,6 +19,7 @@
         <n-input
           v-model:value="form.displayName"
           clearable
+          :maxlength="255"
           :placeholder="t('system.business.modelSettings.modelNamePlaceholder')"
         />
       </n-form-item>
@@ -30,6 +31,7 @@
         <n-input
           v-model:value="form.modelName"
           clearable
+          :maxlength="255"
           :placeholder="t('system.business.modelSettings.modelIdPlaceholder')"
         />
       </n-form-item>
@@ -41,6 +43,7 @@
           v-model:value="form.apiUrl"
           clearable
           :placeholder="t('system.business.modelSettings.apiBaseUrlPlaceholder')"
+          :maxlength="255"
         />
       </n-form-item>
       <n-form-item :label="t('system.business.modelSettings.apiKey')" path="apiKey">
@@ -50,6 +53,7 @@
           show-password-on="click"
           type="password"
           placeholder="sk-..."
+          :maxlength="255"
           :input-props="{ autocomplete: 'new-password', name: 'agent_model_api_key' }"
         />
       </n-form-item>
@@ -155,56 +159,51 @@
     max_tokens: 2048,
     top_p: 0.9,
   };
+  const emptyModelParams: FormModelParams = {
+    temperature: null,
+    max_tokens: null,
+    top_p: null,
+  };
   const defaultForm: AiModelForm = {
     displayName: '',
     provider: 'OpenAI',
     modelName: '',
     apiUrl: '',
     apiKey: '',
-    enable: false,
+    enable: true,
     globalDailyLimit: 10000,
     userDailyLimit: 500,
     modelParams: undefined,
     ...defaultModelParams,
   };
 
-  function parseModelParams(modelParams?: string): FormModelParams {
-    if (!modelParams) {
-      return { ...defaultModelParams };
-    }
+  function createEditForm(model: Partial<AiModelItem>): AiModelForm {
+    const modelParams = model.modelParams
+      ? ({
+          ...(JSON.parse(model.modelParams) as AiModelParams),
+        } as FormModelParams)
+      : { ...emptyModelParams };
 
-    try {
-      const parsedParams = JSON.parse(modelParams) as AiModelParams;
-      return {
-        temperature:
-          typeof parsedParams.temperature === 'number' ? parsedParams.temperature : defaultModelParams.temperature,
-        max_tokens:
-          typeof parsedParams.max_tokens === 'number' ? parsedParams.max_tokens : defaultModelParams.max_tokens,
-        top_p: typeof parsedParams.top_p === 'number' ? parsedParams.top_p : defaultModelParams.top_p,
-      };
-    } catch {
-      return { ...defaultModelParams };
-    }
-  }
-
-  function createDefaultForm(model?: Partial<AiModelItem>): AiModelForm {
     return {
-      ...defaultForm,
-      id: model?.id,
-      displayName: model?.displayName ?? defaultForm.displayName,
-      provider: model?.provider ?? defaultForm.provider,
-      modelName: model?.modelName ?? defaultForm.modelName,
-      apiUrl: model?.apiUrl ?? defaultForm.apiUrl,
-      apiKey: model?.apiKey ?? defaultForm.apiKey,
-      enable: model?.enable ?? defaultForm.enable,
-      globalDailyLimit: model?.globalDailyLimit ?? defaultForm.globalDailyLimit,
-      userDailyLimit: model?.userDailyLimit ?? defaultForm.userDailyLimit,
-      modelParams: model?.modelParams,
-      ...parseModelParams(model?.modelParams),
+      id: model.id,
+      displayName: model.displayName ?? '',
+      provider: model.provider ?? '',
+      modelName: model.modelName ?? '',
+      apiUrl: model.apiUrl ?? '',
+      apiKey: model.apiKey ?? '',
+      enable: model.enable ?? defaultForm.enable,
+      globalDailyLimit: model.globalDailyLimit,
+      userDailyLimit: model.userDailyLimit,
+      modelParams: model.modelParams,
+      ...modelParams,
     };
   }
 
-  const form = reactive(createDefaultForm());
+  function createForm(model?: Partial<AiModelItem>): AiModelForm {
+    return model ? createEditForm(model) : { ...defaultForm };
+  }
+
+  const form = reactive(createForm());
 
   const rules: FormRules = {
     displayName: [
@@ -224,7 +223,7 @@
   };
 
   function resetFormState(model?: Partial<AiModelItem>) {
-    Object.assign(form, createDefaultForm(model));
+    Object.assign(form, createForm(model));
     formRef.value?.restoreValidation();
   }
 

@@ -356,11 +356,16 @@ export function transformData({
             fieldOptionMap[subField.id] = originalData?.optionMap?.[subField.id] || [];
           } else {
             subItem[`${subField.id}_original`] = subItem[subField.businessKey || subField.id]; // 备份原始值以供编辑时填充数据源
-            subItem[subField.id] = parseModuleFieldValue(
+            // 优先使用业务 key 去取值，若没有业务 key 则使用字段 id
+            const parseValue = parseModuleFieldValue(
               subField,
               subItem[subField.businessKey || subField.id],
               originalData?.optionMap?.[subField.businessKey || subField.id]
             );
+            if (subField.businessKey) {
+              subItem[subField.businessKey] = parseValue;
+            }
+            subItem[subField.id] = parseValue;
             fieldOptionMap[subField.businessKey || subField.id] =
               originalData?.optionMap?.[subField.businessKey || subField.id] || [];
           }
@@ -621,4 +626,41 @@ export function transformFieldValue(item: FormCreateField, result: Record<string
     // 数字字段需要重置一下小数位，确保每次保存按照最新配置的小数位保存
     result[key] = Number(Number(result[key]).toFixed(item.precision));
   }
+}
+
+/**
+ * 按公式结果类型格式化展示值。
+ * 数值模式支持小数位和千分位，文本结果不强制转换为数字；
+ * emptyText 用于列表、详情等展示场景的空值占位。
+ */
+export function formatFormulaResultValue(result: any, fieldConfig: FormCreateField, emptyText = '') {
+  if (result === undefined || result === null || result === '') {
+    return emptyText;
+  }
+
+  if (fieldConfig.formulaResultFormat !== 'number') {
+    return String(result);
+  }
+
+  if (typeof result === 'string') {
+    const plainNumberPattern = /^-?(?:\d+|\d*\.\d+)$/;
+    const thousandsNumberPattern = /^-?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/;
+    if (!plainNumberPattern.test(result) && !thousandsNumberPattern.test(result)) {
+      return result;
+    }
+  }
+
+  const num = Number(typeof result === 'string' ? result.replace(/,/g, '') : result);
+  if (Number.isNaN(num)) return String(result);
+
+  const precision = fieldConfig.decimalPlaces ? fieldConfig.precision ?? 0 : 0;
+  if (fieldConfig.showThousandsSeparator) {
+    if (precision > 0) {
+      const [integerPart, decimalPart] = num.toFixed(precision).split('.');
+      return `${integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${decimalPart}`;
+    }
+    return num.toLocaleString('en-US');
+  }
+
+  return precision > 0 ? num.toFixed(precision) : num.toString();
 }
