@@ -1,5 +1,5 @@
 <template>
-  <article class="group mb-[32px] flex gap-[16px]" :class="messageClass">
+  <article class="group mb-[32px] flex gap-[16px] overflow-hidden" :class="messageClass">
     <div>
       <slot name="avatar" :message="props.message">
         <n-avatar v-if="props.message.role === 'assistant'" round class="bg-[var(--primary-6)]" :size="32">
@@ -9,13 +9,20 @@
       </slot>
     </div>
 
-    <div class="min-w-0 max-w-[calc(100%-96px)]" :class="{ 'w-full': !isUser || isEditing }">
+    <div
+      class="flex min-w-0 max-w-[calc(100%-96px)] flex-col overflow-hidden"
+      :class="{
+        'w-full': !isUser || isEditing,
+        'items-end': isUser && !isEditing,
+        'items-start': !isUser,
+      }"
+    >
       <div v-if="roleText.length" class="mb-[8px] font-[600]">
         {{ roleText }}
       </div>
 
-      <div class="ai-chat-message__bubble">
-        <template v-if="isEditing">
+      <template v-if="isEditing">
+        <div class="ai-chat-message__bubble">
           <div class="ai-chat-message__edit rounded-[4px] bg-[var(--text-n9)] p-[16px]">
             <AiComposer
               ref="editComposerRef"
@@ -51,20 +58,22 @@
               </div>
             </div>
           </div>
-        </template>
+        </div>
+      </template>
 
-        <template v-else>
-          <!-- TODO lmy 文件的样式 -->
-          <div v-if="messageAttachments.length" class="mb-[8px] flex flex-wrap gap-[6px]">
-            <div
-              v-for="attachment in messageAttachments"
-              :key="attachment.id"
-              class="max-w-[220px] overflow-hidden truncate rounded-[4px] border border-[var(--text-n8)] bg-[var(--text-n9)] px-[8px] py-[4px] text-[var(--text-n1)]"
-            >
-              {{ attachment.name }}
-            </div>
-          </div>
+      <template v-else>
+        <AiAttachmentList
+          v-if="messageAttachments.length"
+          class="mb-[8px]"
+          :class="{ 'justify-end': isUser }"
+          :attachments="messageAttachments"
+        />
 
+        <div
+          v-if="renderableParts.length || showAssistantLoading"
+          class="ai-chat-message__bubble max-w-full overflow-hidden"
+          :class="{ 'w-full': !isUser }"
+        >
           <template v-for="item in renderableParts" :key="item.key">
             <AiTextBlock v-if="isUserTextPart(item.part)" :part="item.part" :mcps="messageMcps" />
             <component
@@ -77,8 +86,8 @@
             <div v-else class="ai-chat-block">{{ item.part.type }}</div>
           </template>
           <AiLoadingBlock v-if="showAssistantLoading" />
-        </template>
-      </div>
+        </div>
+      </template>
 
       <div
         v-if="showActions"
@@ -108,7 +117,7 @@
 
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue';
-  import { NAvatar, NButton, NTooltip } from 'naive-ui';
+  import { NAvatar, NButton, NTooltip, useMessage } from 'naive-ui';
 
   import type { AiChatMessage, AiChatMessagePart, AiComposerSubmitPayload } from '@lib/shared/ai-chat';
   import { getAiChatMessageText, hasRenderableAiChatContent, useAiChatRuntime } from '@lib/shared/ai-chat';
@@ -122,6 +131,7 @@
   import AiMarkdownBlock from '../blocks/AiMarkdownBlock.vue';
   import AiProgressBlock from '../blocks/AiProgressBlock.vue';
   import AiTextBlock from '../blocks/AiTextBlock.vue';
+  import AiAttachmentList from './AiAttachmentList.vue';
   import AiComposer from './AiComposer.vue';
 
   import { dislikeAgentChat, likeAgentChat } from '@/api/modules';
@@ -142,6 +152,7 @@
   }
 
   const { t } = useI18n();
+  const Message = useMessage();
   const runtime = useAiChatRuntime();
   const { legacyCopy } = useLegacyCopy();
 
@@ -237,6 +248,7 @@
 
     try {
       await likeAgentChat(runId.value);
+      Message.success(t('aiChat.feedbackThanks'));
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
@@ -250,6 +262,7 @@
 
     try {
       await dislikeAgentChat(runId.value);
+      Message.success(t('aiChat.feedbackThanks'));
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);

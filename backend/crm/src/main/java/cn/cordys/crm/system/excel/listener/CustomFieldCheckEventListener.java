@@ -17,6 +17,7 @@ import cn.idev.excel.event.AnalysisEventListener;
 import cn.idev.excel.metadata.CellExtra;
 import lombok.Getter;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 
@@ -72,6 +73,7 @@ public class CustomFieldCheckEventListener extends AnalysisEventListener<Map<Int
      * 表头字段集合 && 业务字段集合映射
      */
     protected Map<Integer, String> headMap;
+    protected Map<Integer, String> checkHeadMap;
     protected Map<String, BusinessModuleField> businessFieldMap;
     /**
      * 错误行号集合
@@ -140,7 +142,7 @@ public class CustomFieldCheckEventListener extends AnalysisEventListener<Map<Int
                 }
                 continue;
             }
-            this.fieldMap.put(field.getName(), field);
+            this.fieldMap.put(field.getName() + "_" + field.getName(), field);
             setCheckLimit(field, null);
             setNumberMax(field, null);
         }
@@ -171,17 +173,28 @@ public class CustomFieldCheckEventListener extends AnalysisEventListener<Map<Int
         if (StringUtils.isNotEmpty(errHead)) {
             throw new GenericException(Translator.getWithArgs("illegal_header", errHead));
         }
+        Map<Integer, String> realHeadMap = new HashMap<>();
         if (maxHeadRow == 2) {
             for (Map.Entry<Integer, String> entry : firstHeadMap.entrySet()) {
                 Integer key = entry.getKey();
                 String value = entry.getValue();
-                if (!Strings.CI.equals(headMap.get(key), value)) {
-                    headMap.put(key, value + "_" + headMap.get(key));
-                }
+                realHeadMap.put(key, value + "_" + headMap.get(key));
             }
-            this.headMap = headMap;
+            this.headMap = realHeadMap;
         } else {
             this.headMap = headMap;
+        }
+        this.checkHeadMap = headMap;
+        if (MapUtils.isEmpty(firstHeadMap)) {
+            Map<String, BaseField> temp = new HashMap<>();
+            fieldMap.forEach((key, value) -> {
+                int index = key.indexOf("_");
+                String newKey = index > -1 ? key.substring(index + 1) : key;
+                temp.put(newKey, value);
+            });
+            this.fieldMap.clear();
+            this.fieldMap.putAll(temp);
+
         }
         this.businessFieldMap = Arrays.stream(BusinessModuleField.values()).
                 collect(Collectors.toMap(BusinessModuleField::getKey, Function.identity()));
@@ -195,7 +208,7 @@ public class CustomFieldCheckEventListener extends AnalysisEventListener<Map<Int
         }
         String sourceId = "";
         Integer key = headMap.entrySet().stream()
-                .filter(entry -> Strings.CI.equals(entry.getValue(), "唯一ID"))
+                .filter(entry -> Strings.CI.equals(entry.getValue(), "唯一ID_唯一ID"))
                 .map(Map.Entry::getKey)
                 .findFirst()
                 .orElse(null);
@@ -242,7 +255,7 @@ public class CustomFieldCheckEventListener extends AnalysisEventListener<Map<Int
      */
     private void validateRowData(Integer rowIndex, Map<Integer, String> rowData, String sourceId) {
         StringBuilder errText = new StringBuilder();
-        headMap.forEach((k, v) -> {
+        checkHeadMap.forEach((k, v) -> {
             if (!isValidateCell(rowIndex, k)) {
                 return;
             }

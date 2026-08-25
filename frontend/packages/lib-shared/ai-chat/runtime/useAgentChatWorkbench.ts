@@ -19,7 +19,9 @@ interface AgentChatWorkbenchApis {
     data: {
       message: string;
       conversationId?: string;
-      mcpNames?: string[];
+      mcpIds?: string[];
+      attachmentIds?: string[];
+      picIds?: string[];
     },
     options: {
       signal?: AbortSignal;
@@ -48,6 +50,26 @@ interface ConversationDraft {
   input: string;
   attachments: AiChatAttachment[];
   selectedMcps: AiChatMcp[];
+}
+
+function getAttachmentId(attachment: AiChatAttachment): string {
+  const fileId = attachment.metadata?.fileId;
+
+  return typeof fileId === 'string' ? fileId : attachment.id;
+}
+
+function getAttachmentIds(attachments: AiChatAttachment[] = []): string[] {
+  return attachments
+    .filter((attachment) => attachment.kind !== 'image')
+    .map(getAttachmentId)
+    .filter(Boolean);
+}
+
+function getPicIds(attachments: AiChatAttachment[] = []): string[] {
+  return attachments
+    .filter((attachment) => attachment.kind === 'image')
+    .map(getAttachmentId)
+    .filter(Boolean);
 }
 
 export default function useAgentChatWorkbench(options: UseAgentChatWorkbenchOptions) {
@@ -147,7 +169,9 @@ export default function useAgentChatWorkbench(options: UseAgentChatWorkbenchOpti
             {
               message: context.content,
               conversationId: agentConversationId.value || undefined,
-              mcpNames: context.metadata?.mcps?.map((mcp) => mcp.name),
+              mcpIds: context.metadata?.mcps?.map((mcp) => mcp.id),
+              attachmentIds: getAttachmentIds(context.metadata?.attachments),
+              picIds: getPicIds(context.metadata?.attachments),
             },
             {
               signal: context.signal,

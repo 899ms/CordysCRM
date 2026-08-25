@@ -73,11 +73,12 @@
     <template #2>
       <main class="h-full min-h-0 min-w-0">
         <AiChatProvider :runtime="runtime">
-          <AiChatContent>
+          <AiChatContent :scroll-to-bottom-key="props.activeHistoryId">
             <template #composer>
               <AiComposer
                 :placeholder="props.placeholder || t('aiChat.inputPlaceholder')"
                 :mcp-options="props.mcpOptions"
+                @mcp-updated="emit('mcpUpdated')"
               />
             </template>
           </AiChatContent>
@@ -137,6 +138,7 @@
     (e: 'historyClick', id: string): void;
     (e: 'historyDelete', id: string): void;
     (e: 'historyRename', id: string, title: string): void;
+    (e: 'mcpUpdated'): void;
   }>();
 
   const keyword = ref('');

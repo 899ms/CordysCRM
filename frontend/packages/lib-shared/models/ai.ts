@@ -3,7 +3,9 @@ import type { CommonList, TableQueryParams } from './common';
 export interface AgentChatStreamParams {
   message: string;
   conversationId?: string;
-  mcpNames?: string[];
+  mcpIds?: string[];
+  attachmentIds?: string[];
+  picIds?: string[];
 }
 
 export interface SmartFocusParams {
@@ -123,7 +125,8 @@ export interface AgentConversationDetail {
   conversation: AgentConversationItem;
 }
 
-export interface AgentConversationMcpToolItem {
+export interface AgentMcpConfigItem {
+  id: string;
   name: string;
   description?: string;
 }

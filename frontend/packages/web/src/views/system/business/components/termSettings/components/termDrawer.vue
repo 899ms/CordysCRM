@@ -149,6 +149,14 @@
         message: t('common.notNull', { value: t('system.business.term.category') }),
         trigger: ['blur', 'change'],
       },
+      {
+        validator: (_rule, value: string) => {
+          const matchedCategory = props.categories.some((category) => category.id === value);
+          return matchedCategory || !value || value.length <= 255;
+        },
+        message: t('system.business.term.categoryMaxLength'),
+        trigger: ['blur', 'change'],
+      },
     ],
     standardTerm: [
       {
@@ -218,12 +226,11 @@
         refreshId = undefined;
         Message.success(t('common.addSuccess'));
       }
-      const nextCatalogId = form.catalogId;
       emit('saved', refreshId, props.adoptDiscoveryId);
       if (!continueAdd) {
         showDrawer.value = false;
       } else {
-        resetFormState({ catalogId: nextCatalogId });
+        resetFormState();
       }
     } catch (error) {
       // eslint-disable-next-line no-console

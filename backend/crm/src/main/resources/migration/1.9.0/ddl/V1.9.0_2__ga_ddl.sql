@@ -1,7 +1,7 @@
 -- set innodb lock wait timeout
 SET SESSION innodb_lock_wait_timeout = 7200;
 
--- agent ddl
+-- agent ddl start
 CREATE TABLE agent_model
 (
     `id`                 VARCHAR(32)   NOT NULL COMMENT 'ID',
@@ -11,8 +11,8 @@ CREATE TABLE agent_model
     `api_url`            VARCHAR(100) COMMENT 'API请求地址',
     `api_key`            VARCHAR(1000) NOT NULL COMMENT 'API Key',
     `enable`             TINYINT(1)    NOT NULL DEFAULT 1 COMMENT '启用状态',
-    `user_daily_limit`   BIGINT                 DEFAULT -1 COMMENT '用户每日调用限制',
-    `global_daily_limit` BIGINT                 DEFAULT -1 COMMENT '全局每日调用限制',
+    `user_daily_limit`   DECIMAL(20, 0)         DEFAULT -1 COMMENT '用户每日调用限制',
+    `global_daily_limit` DECIMAL(20, 0)         DEFAULT -1 COMMENT '全局每日调用限制',
     `model_params`       TEXT(255) COMMENT '模型参数',
     `organization_id`    VARCHAR(32)   NOT NULL COMMENT '组织ID',
     `create_time`        BIGINT        NOT NULL COMMENT '创建时间',
@@ -67,7 +67,7 @@ CREATE TABLE agent_action_suggestion
     `priority`    TINYINT COMMENT '优先级',
     `topic`       VARCHAR(255) COMMENT '行动主题',
     `summary`     VARCHAR(500) COMMENT '行动概括',
-    `content`     BLOB COMMENT '行动上下文',
+    `content`     LONGTEXT COMMENT '行动上下文',
     `user_id`     VARCHAR(32) NOT NULL COMMENT '建议用户',
     `organization_id` VARCHAR(32) NOT NULL   COMMENT '组织ID' ,
     `actions`     VARCHAR(255) COMMENT '行动操作项',
@@ -88,7 +88,7 @@ CREATE TABLE agent_action_approve
     `type`        VARCHAR(255) COMMENT '审核类型',
     `topic`       VARCHAR(255) COMMENT '审核主题',
     `summary`     VARCHAR(500) COMMENT '审核概括',
-    `content`     BLOB COMMENT '审核上下文',
+    `content`     LONGTEXT COMMENT '审核上下文',
     `user_id`     VARCHAR(32) NOT NULL COMMENT '审核用户',
     `organization_id` VARCHAR(32) NOT NULL   COMMENT '组织ID' ,
     `create_time` BIGINT      NOT NULL COMMENT '创建时间',
@@ -193,6 +193,8 @@ CREATE TABLE agent_term_discovery(
 CREATE TABLE agent_task_execute_log(
     `id` VARCHAR(32) NOT NULL   COMMENT 'ID' ,
     `task_id` VARCHAR(32) NOT NULL   COMMENT '任务ID' ,
+    `task_name` VARCHAR(255) NOT NULL   COMMENT '任务名称快照' ,
+    `organization_id` VARCHAR(32) NOT NULL   COMMENT '组织ID' ,
     `run_id` VARCHAR(100) NOT NULL   COMMENT '执行ID' ,
     `execute_time` BIGINT NOT NULL   COMMENT '执行时间' ,
     `execute_reason` VARCHAR(500) NOT NULL   COMMENT '触发原因' ,
@@ -261,6 +263,27 @@ CREATE TABLE agent_trace_event(
     DEFAULT CHARSET = utf8mb4
     COLLATE = utf8mb4_general_ci;
 
+CREATE TABLE agent_mcp_config(
+    `id` VARCHAR(32) NOT NULL   COMMENT 'ID' ,
+    `name` VARCHAR(255) NOT NULL   COMMENT '配置名称' ,
+    `description` VARCHAR(1000)    COMMENT '描述' ,
+    `config_json` TEXT(255) NOT NULL   COMMENT 'JSON配置' ,
+    `user_id` VARCHAR(32) NOT NULL   COMMENT '用户ID' ,
+    `organization_id` VARCHAR(32) NOT NULL   COMMENT '组织ID' ,
+    `create_time` BIGINT NOT NULL   COMMENT '创建时间' ,
+    `update_time` BIGINT NOT NULL   COMMENT '更新时间' ,
+    `create_user` VARCHAR(32) NOT NULL   COMMENT '创建人' ,
+    `update_user` VARCHAR(32) NOT NULL   COMMENT '更新人' ,
+    PRIMARY KEY (id)
+)  COMMENT = 'MCP配置'
+    ENGINE = InnoDB
+    DEFAULT CHARSET = utf8mb4
+    COLLATE = utf8mb4_general_ci;
+
+CREATE INDEX idx_org_id ON agent_mcp_config(organization_id ASC);
+CREATE INDEX idx_user_id ON agent_mcp_config(user_id ASC);
+
+-- agent ddl end
 
 ALTER TABLE follow_up_plan
     ADD COLUMN comment_count BIGINT NOT NULL DEFAULT 0 COMMENT '评论总数，包含回复';

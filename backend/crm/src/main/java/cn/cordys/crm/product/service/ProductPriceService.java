@@ -15,6 +15,7 @@ import cn.cordys.common.exception.GenericException;
 import cn.cordys.common.mapper.CommonMapper;
 import cn.cordys.common.pager.PageUtils;
 import cn.cordys.common.pager.PagerWithOption;
+import cn.cordys.common.service.BaseExportService;
 import cn.cordys.common.service.BaseService;
 import cn.cordys.common.uid.IDGenerator;
 import cn.cordys.common.uid.utils.EnumUtils;
@@ -81,7 +82,7 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(rollbackFor = Exception.class)
 @Slf4j
-public class ProductPriceService {
+public class ProductPriceService extends BaseExportService {
 
     @Resource
     private BaseService baseService;
@@ -354,7 +355,7 @@ public class ProductPriceService {
      */
     public void downloadImportTpl(HttpServletResponse response, String currentOrg) {
         new EasyExcelExporter().exportMultiSheetTplWithSharedHandler(response,
-                moduleFormService.getCustomImportHeadsNoRef(FormKey.PRICE.getKey(), currentOrg),
+                processDuplicateLastLevelHeads(moduleFormService.getCustomImportHeadsNoRef(FormKey.PRICE.getKey(), currentOrg)),
                 Translator.get("product.price.import_tpl.name"),
                 Translator.get(SheetKey.DATA), Translator.get(SheetKey.COMMENT),
                 new CustomTemplateWriteHandler(moduleFormService.getAllCustomImportFields(FormKey.PRICE.getKey(), currentOrg)),
@@ -818,12 +819,25 @@ public class ProductPriceService {
      * @param fieldValue
      * @return
      */
-    public Set<String> getData(Object resourceId, String fieldId, Object fieldValue) {
-        LambdaQueryWrapper<ProductPriceField> priceFieldLambdaQueryWrapper = new LambdaQueryWrapper<>();
-        priceFieldLambdaQueryWrapper.eq(ProductPriceField::getResourceId, resourceId)
-                .eq(ProductPriceField::getFieldId, fieldId)
-                .eq(ProductPriceField::getFieldValue, fieldValue);
-        List<ProductPriceField> productPriceFields = productPriceFieldMapper.selectListByLambda(priceFieldLambdaQueryWrapper);
+    public Set<String> getPriceData(Object resourceId, String fieldId, Object fieldValue) {
+        List<ProductPriceField> productPriceFields = extProductPriceMapper.getPriceData(resourceId, fieldId, fieldValue);
         return productPriceFields.stream().map(ProductPriceField::getBizId).collect(Collectors.toSet());
+    }
+
+    public Set<String> getPriceBlobData(Object resourceId, String fieldId, String fieldValue) {
+        List<ProductPriceField> productPriceFields = extProductPriceMapper.getPriceBlobData(resourceId, fieldId, fieldValue);
+        return productPriceFields.stream().map(ProductPriceField::getBizId).collect(Collectors.toSet());
+    }
+
+    /**
+     * 匹配bizId
+     *
+     * @param resourceId
+     * @param productName
+     * @return
+     */
+    public Set<String> getBizIdsByResource(Object resourceId, String productName) {
+        List<String> bizIds = extProductPriceMapper.getBizIdsByResource(resourceId.toString(), productName);
+        return CollectionUtils.isNotEmpty(bizIds) ? new HashSet<>(bizIds) : new HashSet<>(0);
     }
 }

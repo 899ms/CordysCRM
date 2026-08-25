@@ -14,7 +14,12 @@ export default {
   'aiChat.confirmCancel': 'Cancel',
   'aiChat.thinking': 'Thinking',
   'aiChat.tokensUsed': '{tokens} used',
+  'aiChat.feedbackThanks': 'Thanks for your feedback',
   'aiChat.progress': 'Running',
   'aiChat.progressInput': 'Input',
   'aiChat.progressOutput': 'Output',
+  'aiChat.uploadImage': 'Image',
+  'aiChat.uploadFile': 'Attachment',
+  'aiChat.attachmentUploading': 'Uploading',
+  'aiChat.attachmentUploadFailed': 'Upload failed',
 };
