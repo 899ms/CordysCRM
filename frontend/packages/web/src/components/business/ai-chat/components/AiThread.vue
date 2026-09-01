@@ -20,9 +20,12 @@
             :is-generating="runtime.state.loading.value && message.id === latestMessageId"
           />
           <article v-if="showThreadLoading" class="mb-[32px] flex gap-[16px]">
-            <n-avatar round class="bg-[var(--primary-6)]" :size="32">
-              <CrmIcon type="iconicon_crmbot" :size="20" color="var(--primary-8)" />
-            </n-avatar>
+            <CrmIcon
+              class="shrink-0"
+              type="iconicon_crmbot"
+              :size="32"
+              color="linear-gradient(180deg, #00A6AB 0%, #3370FF 70.19%)"
+            />
 
             <div class="w-full min-w-0">
               <div class="mb-[8px] font-[600]"> CORDYS AI </div>
@@ -48,7 +51,7 @@
 
 <script setup lang="ts">
   import { computed, nextTick, onMounted, ref, watch } from 'vue';
-  import { NAvatar, NButton, NEmpty, NScrollbar, ScrollbarInst } from 'naive-ui';
+  import { NButton, NEmpty, NScrollbar, ScrollbarInst } from 'naive-ui';
 
   import { useAiChatRuntime } from '@lib/shared/ai-chat';
 
@@ -80,7 +83,8 @@
   const shouldStickToBottom = ref(true);
 
   const messages = computed(() => runtime.state.messages.value);
-  const latestMessageId = computed(() => messages.value.at(-1)?.id);
+  const latestMessage = computed(() => messages.value.at(-1));
+  const latestMessageId = computed(() => latestMessage.value?.id);
   const showThreadLoading = computed(() => {
     const lastMessage = messages.value.at(-1);
 
@@ -89,16 +93,16 @@
   const showBackToBottom = computed(() => messages.value.length > 0 && !shouldStickToBottom.value);
 
   const latestMessageSnapshot = computed(() => {
-    const latestMessage = messages.value[messages.value.length - 1];
+    const snapshotMessage = messages.value[messages.value.length - 1];
 
-    if (!latestMessage) {
+    if (!snapshotMessage) {
       return '';
     }
 
     return [
-      latestMessage.id,
-      latestMessage.parts.length,
-      latestMessage.parts.map((part, index) => `${index}:${part.type}:${JSON.stringify(part).length}`).join('|'),
+      snapshotMessage.id,
+      snapshotMessage.parts.length,
+      snapshotMessage.parts.map((part, index) => `${index}:${part.type}:${JSON.stringify(part).length}`).join('|'),
     ].join(':');
   });
 
@@ -141,11 +145,20 @@
   onMounted(async () => {
     await nextTick();
     updateStickToBottom();
+
+    if (props.scrollToBottomKey || messages.value.length > 0) {
+      await scrollToBottom();
+    }
   });
 
   watch(
     () => [messages.value.length, latestMessageSnapshot.value],
     () => {
+      if (latestMessage.value?.role === 'user') {
+        scrollToBottom();
+        return;
+      }
+
       if (!props.autoScroll || !shouldStickToBottom.value) {
         return;
       }

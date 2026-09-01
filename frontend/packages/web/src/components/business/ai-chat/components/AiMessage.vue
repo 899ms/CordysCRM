@@ -2,9 +2,13 @@
   <article class="group mb-[32px] flex gap-[16px] overflow-hidden" :class="messageClass">
     <div>
       <slot name="avatar" :message="props.message">
-        <n-avatar v-if="props.message.role === 'assistant'" round class="bg-[var(--primary-6)]" :size="32">
-          <CrmIcon type="iconicon_crmbot" :size="20" color="var(--primary-8)" />
-        </n-avatar>
+        <CrmIcon
+          v-if="props.message.role === 'assistant'"
+          class="shrink-0"
+          type="iconicon_crmbot"
+          :size="32"
+          color="linear-gradient(180deg, #00A6AB 0%, #3370FF 70.19%)"
+        />
         <CrmAvatar v-else :size="32" class="flex-shrink-0 transition-all" />
       </slot>
     </div>
@@ -70,10 +74,17 @@
         />
 
         <div
-          v-if="renderableParts.length || showAssistantLoading"
+          v-if="thoughtParts.length || renderableParts.length || showAssistantLoading"
           class="ai-chat-message__bubble max-w-full overflow-hidden"
           :class="{ 'w-full': !isUser }"
         >
+          <AiThoughtBlock
+            v-if="thoughtParts.length"
+            :items="thoughtParts"
+            :message-id="props.message.id"
+            :is-generating="isGenerating"
+            :duration="props.message.metadata?.duration"
+          />
           <template v-for="item in renderableParts" :key="item.key">
             <AiTextBlock v-if="isUserTextPart(item.part)" :part="item.part" :mcps="messageMcps" />
             <component
@@ -100,6 +111,8 @@
               class="cursor-pointer"
               :type="action.iconType"
               :size="16"
+              :color="actionColor(action.key)"
+              :class="actionClass(action.key)"
               @click="handleActionSelect(action.key)"
             />
           </template>
@@ -117,10 +130,15 @@
 
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue';
-  import { NAvatar, NButton, NTooltip, useMessage } from 'naive-ui';
+  import { NButton, NTooltip, useMessage } from 'naive-ui';
 
   import type { AiChatMessage, AiChatMessagePart, AiComposerSubmitPayload } from '@lib/shared/ai-chat';
-  import { getAiChatMessageText, hasRenderableAiChatContent, useAiChatRuntime } from '@lib/shared/ai-chat';
+  import {
+    getAiChatMessageCopyText,
+    getAiChatMessageText,
+    hasRenderableAiChatContent,
+    useAiChatRuntime,
+  } from '@lib/shared/ai-chat';
   import { useI18n } from '@lib/shared/hooks/useI18n';
   import { formatThousands } from '@lib/shared/method';
 
@@ -129,8 +147,8 @@
   import AiErrorBlock from '../blocks/AiErrorBlock.vue';
   import AiLoadingBlock from '../blocks/AiLoadingBlock.vue';
   import AiMarkdownBlock from '../blocks/AiMarkdownBlock.vue';
-  import AiProgressBlock from '../blocks/AiProgressBlock.vue';
   import AiTextBlock from '../blocks/AiTextBlock.vue';
+  import AiThoughtBlock from '../blocks/AiThoughtBlock.vue';
   import AiAttachmentList from './AiAttachmentList.vue';
   import AiComposer from './AiComposer.vue';
 
@@ -160,9 +178,7 @@
 
   const assistantPartRenderers: Partial<Record<AiChatMessagePart['type'], Component>> = {
     'text': AiMarkdownBlock,
-    'reasoning': AiMarkdownBlock,
     'data-error': AiErrorBlock,
-    'data-progress': AiProgressBlock,
   };
 
   const isEditing = ref(false);
@@ -172,7 +188,7 @@
   const canRetry = computed(() => props.message.role === 'assistant' && !runtime.state.loading.value);
   const canSubmitEdit = computed(() => editContent.value.trim().length > 0 && !runtime.state.loading.value);
   const isGenerating = computed(() => Boolean(props.isGenerating));
-  const copyableText = computed(() => getAiChatMessageText(props.message));
+  const copyableText = computed(() => getAiChatMessageCopyText(props.message));
   const canCopy = computed(() => copyableText.value.length > 0);
   const canShowActionArea = computed(() => !isEditing.value && (isUser.value || !isGenerating.value));
   const runId = computed(() => props.message.metadata?.runId);
@@ -181,13 +197,37 @@
   const tokenUsageText = computed(() =>
     typeof props.message.metadata?.tokens === 'number' ? formatThousands(props.message.metadata.tokens) : ''
   );
+  const feedback = ref<boolean | undefined>(props.message.metadata?.helpful);
+
+  function actionClass(key: string): Record<string, boolean> {
+    const isActiveFeedback = key === 'like' || key === 'dislike';
+
+    if (!isActiveFeedback || !canFeedback.value) {
+      return {};
+    }
+
+    const active = key === 'like' ? feedback.value === true : feedback.value === false;
+
+    return {
+      'ai-chat-message__feedback--active': active,
+      'cursor-pointer': !active,
+      'cursor-not-allowed': active,
+    };
+  }
+
+  function actionColor(key: string): string | undefined {
+    if ((key === 'like' && feedback.value === true) || (key === 'dislike' && feedback.value === false)) {
+      return 'var(--primary-8)';
+    }
+
+    return undefined;
+  }
 
   const messageAttachments = computed(() => props.message.metadata?.attachments ?? []);
   const messageMcps = computed(() => props.message.metadata?.mcps ?? []);
 
   const renderableParts = computed(() =>
     props.message.parts
-      .filter((part) => ['text', 'reasoning', 'data-error', 'data-progress'].includes(part.type))
       .map((part, index) => {
         const messagePart = { ...part } as AiChatMessagePart;
 
@@ -198,6 +238,20 @@
           renderer: isUser.value ? undefined : assistantPartRenderers[messagePart.type],
         };
       })
+      .filter((item) => ['text', 'data-error'].includes(item.part.type))
+  );
+  const thoughtParts = computed(() =>
+    props.message.parts
+      .map((part, index) => {
+        const messagePart = { ...part } as AiChatMessagePart;
+
+        return {
+          index,
+          key: `${messagePart.type}_${index}`,
+          part: messagePart,
+        };
+      })
+      .filter((item) => !isUser.value && ['reasoning', 'data-progress'].includes(item.part.type))
   );
   const showAssistantLoading = computed(
     () => !isUser.value && isGenerating.value && !hasRenderableAiChatContent(props.message.parts)
@@ -225,6 +279,7 @@
     () => {
       isEditing.value = false;
       editContent.value = '';
+      feedback.value = props.message.metadata?.helpful;
     }
   );
 
@@ -234,20 +289,26 @@
   }
 
   async function handleCopyMessage(): Promise<void> {
-    if (!canCopy.value) {
+    const text = copyableText.value;
+
+    if (!text.trim()) {
       return;
     }
 
-    await legacyCopy(copyableText.value);
+    await legacyCopy(text);
   }
 
   async function handleLikeMessage(): Promise<void> {
-    if (!runId.value) {
+    if (!runId.value || feedback.value === true) {
       return;
     }
 
     try {
       await likeAgentChat(runId.value);
+      feedback.value = true;
+      if (props.message.metadata) {
+        props.message.metadata.helpful = true;
+      }
       Message.success(t('aiChat.feedbackThanks'));
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -256,12 +317,16 @@
   }
 
   async function handleDislikeMessage(): Promise<void> {
-    if (!runId.value) {
+    if (!runId.value || feedback.value === false) {
       return;
     }
 
     try {
       await dislikeAgentChat(runId.value);
+      feedback.value = false;
+      if (props.message.metadata) {
+        props.message.metadata.helpful = false;
+      }
       Message.success(t('aiChat.feedbackThanks'));
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -392,5 +457,8 @@
       border-radius: 4px;
       background: var(--text-n9);
     }
+  }
+  .ai-chat-message__feedback--active {
+    color: var(--primary-8);
   }
 </style>

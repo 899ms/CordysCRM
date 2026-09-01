@@ -1,40 +1,37 @@
 <template>
   <div class="flex w-full items-start gap-[8px] [&+&]:mt-[16px]" :class="{ 'flex-row-reverse': isUser }">
-    <div
+    <CrmIcon
       v-if="!isUser"
-      class="inline-flex h-[40px] w-[40px] flex-none items-center justify-center rounded-[16px] bg-[var(--primary-6)]"
-    >
-      <CrmIcon name="iconicon_crmbot" width="28px" height="28px" color="var(--primary-8)" />
-    </div>
+      name="iconicon_crmbot"
+      width="32px"
+      height="32px"
+      color="linear-gradient(180deg, #00A6AB 0%, #3370FF 70.19%)"
+    />
     <CrmAvatar v-if="isUser" :size="40" :is-word="false" class="rounded-[16px]" />
 
     <div class="flex min-w-0 flex-col" :class="isUser ? 'max-w-[calc(100%-48px)] items-end' : 'flex-1 items-start'">
       <AiMobileAttachmentList
         v-if="messageAttachments.length"
-        class="mb-[8px] w-full"
+        class="mb-[8px] max-w-full"
         :attachments="messageAttachments"
       />
 
       <div
-        v-if="renderableParts.length || showAssistantLoading"
-        class="ai-mobile-message__bubble w-full min-w-0"
+        v-if="thoughtParts.length || renderableParts.length || showAssistantLoading"
+        class="ai-mobile-message__bubble min-w-0 max-w-full"
         :class="{ 'user-message': isUser }"
       >
+        <AiMobileThoughtBlock
+          v-if="thoughtParts.length"
+          :items="thoughtParts"
+          :message-id="props.message.id"
+          :is-generating="isGenerating"
+          :duration="props.message.metadata?.duration"
+        />
         <template v-for="item in renderableParts" :key="item.key">
           <AiMobileTextBlock v-if="item.part.type === 'text' && isUser" :part="item.part" :mcps="messageMcps" />
-          <AiMobileMarkdownBlock
-            v-else-if="item.part.type === 'text' || item.part.type === 'reasoning'"
-            :part="item.part"
-            :index="item.index"
-            :is-generating="isGenerating"
-          />
+          <AiMobileMarkdownBlock v-else-if="item.part.type === 'text'" :part="item.part" :index="item.index" />
           <AiMobileErrorBlock v-else-if="item.part.type === 'data-error'" :part="item.part" />
-          <AiMobileProgressBlock
-            v-else-if="item.part.type === 'data-progress'"
-            :part="item.part"
-            :index="item.index"
-            :is-generating="isGenerating"
-          />
         </template>
         <AiMobileLoadingBlock v-if="showAssistantLoading" />
       </div>
@@ -69,7 +66,7 @@
             name="iconicon_good"
             width="16px"
             height="16px"
-            color="var(--primary-8)"
+            :color="feedback === true ? 'var(--primary-0)' : 'var(--primary-8)'"
             @click="handleFeedbackMessage('like')"
           />
           <CrmIcon
@@ -77,7 +74,7 @@
             name="iconicon_bad"
             width="16px"
             height="16px"
-            color="var(--primary-8)"
+            :color="feedback === false ? 'var(--primary-0)' : 'var(--primary-8)'"
             @click="handleFeedbackMessage('dislike')"
           />
           <CrmIcon
@@ -100,13 +97,13 @@
 </template>
 
 <script setup lang="ts">
-  import { computed } from 'vue';
+  import { computed, ref, watch } from 'vue';
   import { showFailToast, showSuccessToast } from 'vant';
 
   import {
     type AiChatMessage,
     type AiChatMessagePart,
-    getAiChatMessageText,
+    getAiChatMessageCopyText,
     hasRenderableAiChatContent,
     useAiChatRuntime,
   } from '@lib/shared/ai-chat';
@@ -118,8 +115,8 @@
   import AiMobileErrorBlock from '../blocks/AiMobileErrorBlock.vue';
   import AiMobileLoadingBlock from '../blocks/AiMobileLoadingBlock.vue';
   import AiMobileMarkdownBlock from '../blocks/AiMobileMarkdownBlock.vue';
-  import AiMobileProgressBlock from '../blocks/AiMobileProgressBlock.vue';
   import AiMobileTextBlock from '../blocks/AiMobileTextBlock.vue';
+  import AiMobileThoughtBlock from '../blocks/AiMobileThoughtBlock.vue';
   import AiMobileAttachmentList from './AiMobileAttachmentList.vue';
 
   import { dislikeAgentChat, likeAgentChat } from '@/api/modules';
@@ -135,7 +132,6 @@
   const isUser = computed(() => props.message.role === 'user');
   const renderableParts = computed(() =>
     props.message.parts
-      .filter((part) => ['text', 'reasoning', 'data-error', 'data-progress'].includes(part.type))
       .map((part, index) => {
         const messagePart = { ...part } as AiChatMessagePart;
 
@@ -145,11 +141,25 @@
           part: messagePart,
         };
       })
+      .filter((item) => ['text', 'data-error'].includes(item.part.type))
+  );
+  const thoughtParts = computed(() =>
+    props.message.parts
+      .map((part, index) => {
+        const messagePart = { ...part } as AiChatMessagePart;
+
+        return {
+          index,
+          key: `${messagePart.type}_${index}`,
+          part: messagePart,
+        };
+      })
+      .filter((item) => !isUser.value && ['reasoning', 'data-progress'].includes(item.part.type))
   );
   const showAssistantLoading = computed(
     () => props.message.role === 'assistant' && props.isGenerating && !hasRenderableAiChatContent(props.message.parts)
   );
-  const copyableText = computed(() => getAiChatMessageText(props.message));
+  const copyableText = computed(() => getAiChatMessageCopyText(props.message));
   const canCopy = computed(() => copyableText.value.length > 0);
   const canRetry = computed(() => props.message.role === 'assistant' && !runtime.state.loading.value);
   const canEdit = computed(() => props.message.role === 'user' && !runtime.state.loading.value);
@@ -158,12 +168,20 @@
   const tokenUsageText = computed(() =>
     typeof props.message.metadata?.tokens === 'number' ? formatThousands(props.message.metadata.tokens) : ''
   );
+  const feedback = ref<boolean | undefined>(props.message.metadata?.helpful);
   const messageAttachments = computed(() => props.message.metadata?.attachments ?? []);
   const messageMcps = computed(() => props.message.metadata?.mcps ?? []);
   const showActions = computed(
     () =>
       !props.isGenerating &&
       (canCopy.value || canRetry.value || canFeedback.value || canEdit.value || tokenUsageText.value)
+  );
+
+  watch(
+    () => props.message.id,
+    () => {
+      feedback.value = props.message.metadata?.helpful;
+    }
   );
 
   async function handleCopyMessage() {
@@ -188,11 +206,20 @@
       return;
     }
 
+    const picked = type === 'like';
+    if (feedback.value === picked) {
+      return;
+    }
+
     try {
       if (type === 'like') {
         await likeAgentChat(runId.value);
       } else {
         await dislikeAgentChat(runId.value);
+      }
+      feedback.value = picked;
+      if (props.message.metadata) {
+        props.message.metadata.helpful = picked;
       }
       showSuccessToast(t('aiChat.feedbackThanks'));
     } catch (error) {
@@ -221,14 +248,14 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 8px;
     padding-top: 8px;
-    border-top: 1px solid var(--text-n8);
     &--user {
       justify-content: flex-end;
     }
     &--assistant {
+      margin-top: 8px;
       width: 100%;
+      border-top: 1px solid var(--text-n8);
     }
   }
 </style>

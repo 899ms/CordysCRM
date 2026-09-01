@@ -3,9 +3,9 @@
     <n-collapse v-model:expanded-names="expandedNames" arrow-placement="right">
       <n-collapse-item :name="partId">
         <template #header>
-          <div class="inline-flex min-w-0 max-w-full items-center gap-[8px]">
-            <CrmIcon type="iconicon_set_up" :size="16" class="text-[var(--text-n4)]" />
-            <span class="min-w-0 flex-1 truncate">
+          <div class="inline-flex min-w-0 max-w-full items-start gap-[8px]">
+            <CrmIcon type="iconicon_set_up" :size="16" class="mt-[3px] shrink-0 text-[var(--text-n4)]" />
+            <span class="min-w-0 flex-1 whitespace-normal break-words">
               {{ progress?.title || t('aiChat.progress') }}
             </span>
           </div>
@@ -27,7 +27,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue';
+  import { computed, ref } from 'vue';
   import { NCollapse, NCollapseItem } from 'naive-ui';
 
   import type { AiChatDataParts } from '@lib/shared/ai-chat';
@@ -48,22 +48,8 @@
 
   const progress = computed<AgentChatProgressData>(() => props.part.data as AgentChatProgressData);
   const partId = computed(() => `${props.part.type}_${props.index ?? 0}`);
-  const expandedNames = ref<string[]>(props.isGenerating ? [partId.value] : []);
+  const expandedNames = ref<string[]>([]);
   const hasDetails = computed(() => Boolean(progress.value?.details?.input || progress.value?.details?.output));
-
-  watch(
-    () => partId.value,
-    (id) => {
-      expandedNames.value = props.isGenerating ? [id] : [];
-    }
-  );
-
-  watch(
-    () => props.isGenerating,
-    (isGenerating) => {
-      expandedNames.value = isGenerating ? [partId.value] : [];
-    }
-  );
 </script>
 
 <style scoped lang="less">
@@ -71,6 +57,9 @@
     width: 100%;
     :deep(.n-collapse) {
       width: 100%;
+    }
+    :deep(.n-collapse-item) {
+      margin-left: 0;
     }
     :deep(.n-collapse-item__header) {
       min-width: 0;

@@ -20,7 +20,7 @@
           {{ t('workbench.smart.dataOverviewGenerating') }}
         </div>
       </div>
-      <div v-if="dataOverviewAIRenderString && aiSummaryVisible" class="bg-[var(--primary-7)] px-[20px] py-[8px]">
+      <div v-if="dataOverviewAIRenderString && aiSummaryVisible" class="bg-[var(--text-n9)] px-[20px] py-[8px]">
         <div class="flex items-center gap-[8px] font-semibold text-[var(--primary-8)]">
           <CrmIcon name="iconicon_star1" width="16px" height="16px" color="var(--primary-8)" />
           <span>{{ t('workbench.smart.AIRead') }}</span>
@@ -101,27 +101,6 @@
               <div class="mt-[16px] whitespace-pre-wrap text-[var(--text-n2)]">
                 {{ item.summary || '-' }}
               </div>
-              <div class="mt-[16px] flex flex-wrap gap-[8px]">
-                <van-button
-                  v-if="item.actions"
-                  size="small"
-                  plain
-                  type="primary"
-                  :loading="operatingSuggestionId === item.id"
-                  @click="handleSuggestionSubmit(item, item.actions)"
-                >
-                  {{ item.actions }}
-                </van-button>
-                <van-button
-                  size="small"
-                  plain
-                  type="primary"
-                  :loading="operatingSuggestionId === item.id"
-                  @click="handleSuggestionIgnore(item)"
-                >
-                  {{ t('workbench.smart.ignore') }}
-                </van-button>
-              </div>
             </div>
           </template>
         </CrmList>
@@ -136,21 +115,22 @@
         >
           <template #item="{ item }">
             <div class="mobile-smart-action-card">
-              <div class="flex items-center justify-between gap-[12px]">
-                <div class="flex min-w-0 items-center gap-[8px]">
+              <div class="mobile-smart-action-header">
+                <div class="mobile-smart-action-title">
                   <CrmTag
-                    class="shrink-0"
+                    class="mobile-smart-action-tag"
                     :bg-color="stageStyle('warning').bgColor"
+                    :one-line="false"
                     :tag="item.type"
                     :text-color="stageStyle('warning').color"
                   />
-                  <div class="one-line-text font-semibold">
+                  <span class="font-semibold">
                     {{ item.topic || '-' }}
-                  </div>
+                  </span>
                 </div>
                 <CrmIcon
                   name="iconicon_close"
-                  class="shrink-0 text-[var(--text-n2)]"
+                  class="mt-[4px] shrink-0 text-[var(--text-n2)]"
                   width="16px"
                   height="16px"
                   @click="handleApproveIgnore(item)"
@@ -193,8 +173,8 @@
   import { useI18n } from '@lib/shared/hooks/useI18n';
   import type { AgentActionApproveItem, AgentActionSuggestionItem } from '@lib/shared/models/ai';
 
-  import CrmList from '@/components/pure/crm-list/index.vue';
   import CrmIcon from '@/components/pure/crm-icon-font/index.vue';
+  import CrmList from '@/components/pure/crm-list/index.vue';
   import CrmTag from '@/components/pure/crm-tag/index.vue';
   import AiMobileMarkdownBlock from '@/components/business/ai-chat/blocks/AiMobileMarkdownBlock.vue';
 
@@ -208,7 +188,6 @@
     ignoreAgentActionSuggestion,
     regenerateSmartAiSummary,
     regenerateSmartDataOverview,
-    submitAgentActionSuggestion,
   } from '@/api/modules';
 
   const { t } = useI18n();
@@ -388,10 +367,6 @@
     }
   }
 
-  function handleSuggestionSubmit(item: AgentActionSuggestionItem, label: string) {
-    return handleSuggestionAction(item, (id) => submitAgentActionSuggestion(id, label));
-  }
-
   function handleSuggestionIgnore(item: AgentActionSuggestionItem) {
     return handleSuggestionAction(item, ignoreAgentActionSuggestion);
   }
@@ -462,8 +437,27 @@
     border: 1px solid var(--text-n8);
     border-radius: var(--border-radius-small);
   }
+  .mobile-smart-action-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .mobile-smart-action-title {
+    flex: 1;
+    min-width: 0;
+    line-height: 24px;
+    word-break: break-word;
+  }
+  .mobile-smart-action-tag.van-tag {
+    display: inline-flex;
+    vertical-align: top;
+    margin-right: 8px;
+    max-width: 100%;
+    height: auto;
+    line-height: 18px;
+  }
   .smart-ai-summary-markdown {
-    color: var(--primary-8) !important;
+    color: var(--text-n2) !important;
     :deep(*) {
       color: inherit;
     }

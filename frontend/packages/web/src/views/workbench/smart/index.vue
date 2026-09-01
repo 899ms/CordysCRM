@@ -39,7 +39,7 @@
           :show="aiSummaryLoading"
           class="bg-[var(--text-n10)] px-[24px] pb-[24px]"
         >
-          <div class="rounded-[4px] bg-[var(--primary-7)] p-[16px] text-[var(--primary-8)]">
+          <div class="rounded-[4px] bg-[var(--text-n9)] p-[16px] text-[var(--primary-8)]">
             <div class="flex items-center gap-[8px] font-semibold">
               <CrmIcon type="iconicon_star1" :size="16" color="var(--primary-8)" />
               <span>{{ t('workbench.smart.AIRead') }}</span>
@@ -102,27 +102,6 @@
                     </div>
                     <div class="mt-[16px] whitespace-pre-wrap text-[var(--text-n2)]">
                       {{ item.summary || '-' }}
-                    </div>
-                    <div class="mt-[16px] flex flex-wrap gap-[8px]">
-                      <n-button
-                        v-if="item.actions"
-                        size="small"
-                        type="primary"
-                        ghost
-                        :loading="operatingSuggestionId === item.id"
-                        @click="handleSuggestionSubmit(item, item.actions)"
-                      >
-                        {{ item.actions }}
-                      </n-button>
-                      <n-button
-                        size="small"
-                        type="primary"
-                        ghost
-                        :loading="operatingSuggestionId === item.id"
-                        @click="handleSuggestionIgnore(item)"
-                      >
-                        {{ t('workbench.smart.ignore') }}
-                      </n-button>
                     </div>
                   </div>
                 </div>
@@ -229,7 +208,6 @@
     ignoreAgentActionSuggestion,
     regenerateSmartAiSummary,
     regenerateSmartDataOverview,
-    submitAgentActionSuggestion,
   } from '@/api/modules';
 
   const { t } = useI18n();
@@ -481,10 +459,6 @@
     }
   }
 
-  function handleSuggestionSubmit(item: AgentActionSuggestionItem, label: string) {
-    return handleSuggestionAction(item, (id) => submitAgentActionSuggestion(id, label));
-  }
-
   function handleSuggestionIgnore(item: AgentActionSuggestionItem) {
     return handleSuggestionAction(item, ignoreAgentActionSuggestion);
   }
@@ -537,7 +511,7 @@
     border-radius: 4px;
   }
   .smart-ai-summary-markdown {
-    color: var(--primary-8);
+    color: var(--text-n2);
     :deep(*) {
       color: inherit;
     }

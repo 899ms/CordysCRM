@@ -3,8 +3,8 @@
     <van-collapse v-model="activeNames" :border="false">
       <van-collapse-item :name="partId">
         <template #title>
-          <div class="mr-[4px] flex min-w-0 items-center gap-[8px]">
-            <CrmIcon name="iconicon_set_up" width="16px" height="16px" color="var(--text-n4)" />
+          <div class="mr-[4px] flex min-w-0 items-start gap-[8px]">
+            <CrmIcon name="iconicon_set_up" width="16px" height="16px" color="var(--text-n4)" class="mt-[3px]" />
             <span class="ai-mobile-progress__title">
               {{ progress?.title || t('aiChat.progress') }}
             </span>
@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue';
+  import { computed, ref } from 'vue';
 
   import type { AiChatDataParts } from '@lib/shared/ai-chat';
   import { useI18n } from '@lib/shared/hooks/useI18n';
@@ -47,22 +47,8 @@
   const { t } = useI18n();
   const progress = computed(() => props.part.data as AgentChatProgressData | undefined);
   const partId = computed(() => `${props.part.type}_${props.index ?? 0}`);
-  const activeNames = ref<string[]>(props.isGenerating ? [partId.value] : []);
+  const activeNames = ref<string[]>([]);
   const hasDetails = computed(() => Boolean(progress.value?.details?.input || progress.value?.details?.output));
-
-  watch(
-    () => partId.value,
-    (id) => {
-      activeNames.value = props.isGenerating ? [id] : [];
-    }
-  );
-
-  watch(
-    () => props.isGenerating,
-    (isGenerating) => {
-      activeNames.value = isGenerating ? [partId.value] : [];
-    }
-  );
 </script>
 
 <style scoped lang="less">
@@ -91,10 +77,11 @@
     }
   }
   .ai-mobile-progress__title {
-    overflow: hidden;
+    flex: 1;
     min-width: 0;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 22px;
+    white-space: normal;
+    word-break: break-word;
   }
   .ai-mobile-progress__detail {
     overflow: hidden;

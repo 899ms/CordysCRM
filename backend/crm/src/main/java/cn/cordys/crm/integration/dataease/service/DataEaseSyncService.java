@@ -24,6 +24,7 @@ import cn.cordys.security.UserDTO;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -56,7 +57,7 @@ public class DataEaseSyncService {
     @Resource
     private DataEaseService dataEaseService;
 
-    @QuartzScheduled(cron = "0 0 0 * * ?")
+    @QuartzScheduled(cron = "0 0 1 * * ?")
     public void syncDataEase() {
         Set<String> orgIds = extOrganizationMapper.selectAllOrganizationIds();
         // 同步角色
@@ -75,7 +76,9 @@ public class DataEaseSyncService {
             log.error("获取DataEase配置失败，组织ID: {}", orgId, e);
             return;
         }
-        if (thirdConfig == null || StringUtils.isAnyBlank(thirdConfig.getDeAccessKey(), thirdConfig.getDeSecretKey(), thirdConfig.getDeOrgID(), thirdConfig.getRedirectUrl())) {
+        if (thirdConfig == null
+                || StringUtils.isAnyBlank(thirdConfig.getDeAccessKey(), thirdConfig.getDeSecretKey(), thirdConfig.getDeOrgID(), thirdConfig.getRedirectUrl())
+                || BooleanUtils.isNotTrue(thirdConfig.getDeAutoSync())) {
             return;
         }
         try {
@@ -94,7 +97,7 @@ public class DataEaseSyncService {
         deTempResourceDTO.setCrmOrgId(orgId);
         deTempResourceDTO.setDeOrgId(thirdConfig.getDeOrgID());
 
-        // 手动切到 DE 组织，DE 接口设计不是很好，接口调用会受到页面切组织的影响，后天手动切组织，降低影响
+        // 手动切到 DE 组织，DE 接口设计不是很好，接口调用会受到页面切组织的影响，需要手动切组织，降低影响
         dataEaseClient.switchOrg(deTempResourceDTO.getDeOrgId());
         syncSysVariable(deTempResourceDTO);
 
@@ -572,10 +575,14 @@ public class DataEaseSyncService {
         Map<String, Map<String, String>> variableValueMap = deTempResourceDTO.getVariableValueMap();
 
         DataEaseClient dataEaseClient = deTempResourceDTO.getDataEaseClient();
+        // 切组织
+        dataEaseClient.switchOrg(deTempResourceDTO.getDeOrgId());
         List<SysVariableDTO> sysVariables = dataEaseClient.listSysVariable();
 
         Map<String, SysVariableDTO> sysVariableMap = sysVariables.stream()
                 .collect(Collectors.toMap(SysVariableDTO::getName, Function.identity()));
+        log.info("DE同步读变量 orgId={} deOrgId={} 变量数={}", deTempResourceDTO.getCrmOrgId(),
+                deTempResourceDTO.getDeOrgId(), sysVariableMap.size());
         // 记录变量名和变量的映射
         deTempResourceDTO.setSysVariableMap(sysVariableMap);
 
@@ -632,19 +639,27 @@ public class DataEaseSyncService {
             } else {
                 // 同步部门
                 SysVariableDTO sysVariable = sysVariableMap.get(value.name());
+                // 切组织
+                dataEaseClient.switchOrg(deTempResourceDTO.getDeOrgId());
+                List<SysVariableValueDTO> deValues = dataEaseClient.listSysVariableValue(sysVariable.getId());
                 Map<String, SysVariableValueDTO> valueMap = new HashMap<>();
-                dataEaseClient.listSysVariableValue(sysVariable.getId())
-                        .forEach(sysVariableValue -> valueMap.put(sysVariableValue.getValue(), sysVariableValue));
+                deValues.forEach(sysVariableValue -> valueMap.put(sysVariableValue.getValue(), sysVariableValue));
+                log.info("DE同步部门变量 orgId={} deOrgId={} variable={} DE现有{}条 应同步{}条",
+                        deTempResourceDTO.getCrmOrgId(), deTempResourceDTO.getDeOrgId(), value.name(),
+                        valueMap.size(), deptIds.size());
 
                 variableValueMap.putIfAbsent(sysVariable.getId(), new HashMap<>());
                 Map<String, String> variableValueIdNameMap = variableValueMap.get(sysVariable.getId());
                 valueMap.forEach((variableValueId, sysVariableValue) ->
                         variableValueIdNameMap.put(sysVariableValue.getValue(), sysVariableValue.getId()));
 
-                // 取 deptIds 和 valueMap.key() 的差集
+                // 取 deptIds 和 valueMap.key() 的差集（DE 缺失的部门，需要创建）
                 List<String> addValues = deptIds.stream()
                         .filter(deptId -> !valueMap.containsKey(deptId))
                         .toList();
+                if (CollectionUtils.isNotEmpty(addValues)) {
+                    log.info("DE同步部门变量创建 variable={} 待建{}条={}", value.name(), addValues.size(), addValues);
+                }
 
                 SysVariableValueCreateRequest variableValueCreateRequest = new SysVariableValueCreateRequest();
                 variableValueCreateRequest.setSysVariableId(sysVariable.getId());
@@ -664,6 +679,7 @@ public class DataEaseSyncService {
                         .map(key -> valueMap.get(key).getId())
                         .collect(Collectors.toList());
                 if (CollectionUtils.isNotEmpty(deleteValueIds)) {
+                    log.info("DE同步部门变量删除 variable={} 待删{}条={}", value.name(), deleteValueIds.size(), deleteValueIds);
                     dataEaseClient.batchDelSysVariableValue(deleteValueIds);
                 }
             }

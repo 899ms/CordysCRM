@@ -47,6 +47,7 @@
         </n-button>
         <n-divider vertical class="!mx-[12px]" />
         <n-dropdown
+          :key="mcpDropdownKey"
           v-model:show="mcpDropdownShow"
           trigger="click"
           placement="top-start"
@@ -162,6 +163,8 @@
   );
 
   const mcpDropdownShow = ref(false);
+  const mcpDropdownKey = ref(0);
+  const shouldReopenMcpDropdown = ref(false);
   const isComposing = ref(false);
 
   function focusInput(): void {
@@ -383,6 +386,7 @@
     try {
       await importAgentMcpConfig(file);
       Message.success(t('aiChat.mcpImportSuccess'));
+      shouldReopenMcpDropdown.value = mcpDropdownShow.value;
       emit('mcpUpdated');
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -482,7 +486,19 @@
     }
 
     return h('div', { class: 'flex w-full min-w-0 items-center gap-[8px]' }, [
-      h('div', { class: 'min-w-0 flex-1' }, node),
+      h(
+        NTooltip,
+        {
+          delay: 300,
+          flip: true,
+          placement: 'top',
+          to: 'body',
+        },
+        {
+          trigger: () => h('div', { class: 'min-w-0 flex-1' }, node),
+          default: () => option.label as string,
+        }
+      ),
       h(
         NButton,
         {
@@ -552,9 +568,17 @@
 
   watch(
     () => props.mcpOptions,
-    () => {
+    async () => {
       if (props.syncRuntime) {
         runtime.setSelectedMcps(getEditorMcps());
+      }
+
+      if (shouldReopenMcpDropdown.value) {
+        shouldReopenMcpDropdown.value = false;
+        mcpDropdownShow.value = false;
+        mcpDropdownKey.value += 1;
+        await nextTick();
+        mcpDropdownShow.value = true;
       }
     }
   );
@@ -891,10 +915,15 @@
 <style scoped lang="scss">
   .ai-chat-composer {
     box-shadow: 0 4px 15px 2px #6467671a;
+    transition: border-color 0.2s ease;
+    &:focus-within {
+      border-color: var(--primary-8) !important;
+    }
   }
   .ai-chat-composer__input {
     overflow-y: auto;
     min-width: 0;
+    min-height: 52px;
     max-height: 132px;
     white-space: pre-wrap;
     color: var(--text-n1);

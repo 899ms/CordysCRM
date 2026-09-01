@@ -3,10 +3,22 @@
     <div ref="threadRef" class="h-full overflow-y-auto px-[12px] py-[14px]" @scroll="handleScroll">
       <div
         v-if="messages.length === 0"
-        class="flex h-full flex-col items-center justify-center gap-[8px] text-[var(--text-n4)]"
+        class="flex h-full flex-col items-center justify-center px-[24px] text-[var(--text-n1)]"
       >
-        <CrmIcon name="iconicon_crmbot" width="32px" height="32px" color="var(--text-n4)" />
-        <div>{{ t('aiChat.noConversation') }}</div>
+        <div class="mb-[32px] text-[24px] font-[600]">
+          {{ t('aiChat.emptyTitle') }}
+        </div>
+        <div class="grid w-full grid-cols-1 gap-[12px]">
+          <div
+            v-for="item in emptySuggestionList"
+            :key="item.label"
+            class="flex min-h-[58px] items-center gap-[8px] rounded-[4px] border border-solid border-[var(--text-n8)] bg-[var(--text-n10)] px-[16px] text-[16px] font-[600] active:bg-[var(--text-n9)]"
+            @click="handleSuggestionClick(item.label)"
+          >
+            <CrmIcon :name="item.icon" width="24px" height="24px" class="shrink-0" />
+            <span>{{ item.label }}</span>
+          </div>
+        </div>
       </div>
 
       <template v-else>
@@ -17,11 +29,12 @@
           :is-generating="runtime.state.loading.value && message.id === latestMessageId"
         />
         <div v-if="showThreadLoading" class="flex w-full items-start gap-[8px] [&+&]:mt-[16px]">
-          <div
-            class="inline-flex h-[40px] w-[40px] flex-none items-center justify-center rounded-[16px] bg-[var(--primary-6)]"
-          >
-            <CrmIcon name="iconicon_crmbot" width="28px" height="28px" color="var(--primary-8)" />
-          </div>
+          <CrmIcon
+            name="iconicon_crmbot"
+            width="32px"
+            height="32px"
+            color="linear-gradient(180deg, #00A6AB 0%, #3370FF 70.19%)"
+          />
 
           <div class="min-w-0 flex-1">
             <AiMobileLoadingBlock />
@@ -41,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick, ref, watch } from 'vue';
+  import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
   import { useAiChatRuntime } from '@lib/shared/ai-chat';
   import { useI18n } from '@lib/shared/hooks/useI18n';
@@ -50,12 +63,40 @@
   import AiMobileLoadingBlock from '../blocks/AiMobileLoadingBlock.vue';
   import AiMobileMessage from './AiMobileMessage.vue';
 
+  const props = withDefaults(
+    defineProps<{
+      scrollToBottomKey?: string | number;
+    }>(),
+    {
+      scrollToBottomKey: '',
+    }
+  );
+
   const runtime = useAiChatRuntime();
   const { t } = useI18n();
   const threadRef = ref<HTMLElement | null>(null);
   const shouldStickToBottom = ref(true);
   const messages = computed(() => runtime.state.messages.value);
-  const latestMessageId = computed(() => messages.value.at(-1)?.id);
+  const latestMessage = computed(() => messages.value.at(-1));
+  const latestMessageId = computed(() => latestMessage.value?.id);
+  const emptySuggestionList = [
+    {
+      icon: 'icon-ai',
+      label: t('aiChat.emptyCustomerLookup'),
+    },
+    {
+      icon: 'icon-ai3',
+      label: t('aiChat.emptySalesBrief'),
+    },
+    {
+      icon: 'icon-ai2',
+      label: t('aiChat.emptyReceivablesSummary'),
+    },
+    {
+      icon: 'icon-ai4',
+      label: t('aiChat.emptyOpportunityStats'),
+    },
+  ];
   const showThreadLoading = computed(() => {
     const lastMessage = messages.value.at(-1);
 
@@ -82,6 +123,10 @@
     shouldStickToBottom.value = isNearBottom();
   }
 
+  function handleSuggestionClick(label: string): void {
+    runtime.setInput(label);
+  }
+
   async function scrollToBottom(): Promise<void> {
     await nextTick();
 
@@ -98,6 +143,11 @@
   watch(
     () => JSON.stringify(messages.value.map((message) => [message.id, message.parts.length, message.parts.at(-1)])),
     () => {
+      if (latestMessage.value?.role === 'user') {
+        scrollToBottom();
+        return;
+      }
+
       if (shouldStickToBottom.value) {
         scrollToBottom();
       }
@@ -108,6 +158,26 @@
   watch(showThreadLoading, () => {
     if (shouldStickToBottom.value) {
       scrollToBottom();
+    }
+  });
+
+  watch(
+    () => props.scrollToBottomKey,
+    async (key) => {
+      if (!key) {
+        return;
+      }
+
+      await scrollToBottom();
+    },
+    { flush: 'post' }
+  );
+
+  onMounted(async () => {
+    await nextTick();
+
+    if (props.scrollToBottomKey || messages.value.length > 0) {
+      await scrollToBottom();
     }
   });
 </script>
